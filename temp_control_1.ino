@@ -32,7 +32,7 @@
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
-#include "DHTesp.h"
+#include "DHTesp.h" // Temp sensor
 
 #ifdef ESP32
 #pragma message(THIS CODE IS FOR ESP8266 ONLY!)
@@ -58,7 +58,8 @@ const char *password = STAPSK;
 
 ESP8266WebServer server(80);
 
-const int led = 13;
+#define LED 13
+static unsigned long warmMinutes = 0;
 
 #define TEMP_SAMPLES 1000
 int8_t temp_5min[TEMP_SAMPLES]; // 83 hours of temperature recordings 
@@ -73,7 +74,7 @@ int8_t target_temp = 63;  // default is 63 degrees Celsius
 #define HYSTERESIS 1  // ºC up and down from target temp when heating is switched on and off
 
 void handleRoot() {
-  digitalWrite(led, 1);
+  digitalWrite(LED, 1);
   char temp[1400];
   int sec = millis() / 1000;
   int min = sec / 60;
@@ -98,6 +99,7 @@ void handleRoot() {
     <p>Current Max. Temperature: %3d deg. C</p>\
     <p>Current Heater Control Relais State: %3d</p>\
     <p>Next Temperature Sample number: %3d</p>\
+    <p>Minutes with Temperature > target - 1 deg. C: %3d min.</p>\
     <img src=\"/test.svg\" />\
   </body>\
 </html>",
@@ -108,14 +110,15 @@ void handleRoot() {
            target_temp,
            MAX_TEMP,
            relais_state,
-           next_sample
+           next_sample,
+           warmMinutes
           );
   server.send(200, "text/html", temp);
-  digitalWrite(led, 0);
+  digitalWrite(LED, 0);
 }
 
 void handleNotFound() {
-  digitalWrite(led, 1);
+  digitalWrite(LED, 1);
   String message = "File Not Found\n\n";
   message += "URI: ";
   message += server.uri();
@@ -130,7 +133,7 @@ void handleNotFound() {
   }
 
   server.send(404, "text/plain", message);
-  digitalWrite(led, 0);
+  digitalWrite(LED, 0);
 }
 
 void drawGraph() {
@@ -153,8 +156,8 @@ void drawGraph() {
 }
 
 void setup(void) {
-  pinMode(led, OUTPUT);
-  digitalWrite(led, 0);
+  pinMode(LED, OUTPUT);
+  digitalWrite(LED, 0);
   pinMode(RELAIS, OUTPUT);
   digitalWrite(RELAIS, 0);
   Serial.begin(115200);
@@ -181,6 +184,7 @@ void setup(void) {
       delay(1000);
     }
   }
+  MDNS.addService("http", "tcp", 80);
   Serial.print("mDNS responder started: ");
   Serial.println(MDNS_NAME);
 
@@ -199,10 +203,10 @@ static unsigned long TempCtrlMarker = 0;
 #define isTimeToCtrlTemp() ((millis() - TempCtrlMarker) > TEMP_CTRL_INTERVAL_S * 1000)
 
 void tempCtrlLoop() {
-  if (target_temp > MAX_TEMP) {
-    target_temp = MAX_TEMP - 1;
-  }
   if (isTimeToCtrlTemp()) {
+    if (target_temp > MAX_TEMP) {
+      target_temp = MAX_TEMP - 1;
+    }
     if (cur_temp > target_temp) {
       relais_state = 0;
     } else {
@@ -212,6 +216,7 @@ void tempCtrlLoop() {
     }
     digitalWrite(RELAIS, relais_state);
     Serial.print("Heat Relais in State: "); Serial.println(relais_state);
+    TempCtrlMarker = millis();
   }
 }
 
@@ -219,14 +224,11 @@ void tempCtrlLoop() {
 void tempEmergencyLoop() {
   if (cur_temp > MAX_TEMP) {
     digitalWrite(RELAIS, LOW);
+    digitalWrite(BEEPER, HIGH);
   }
-  digitalWrite(BEEPER, HIGH);
 }
 
-void loop(void) {
-  server.handleClient();
-  tempCtrlLoop();
-  tempEmergencyLoop();
+void tempSensorLoop() {
   if (isTimeToSampleDHT()) {
     cur_temp = dht.getTemperature();
     cur_hum = dht.getHumidity();
@@ -234,6 +236,9 @@ void loop(void) {
     Serial.print("Cur. Temperature measured to be: "); Serial.print(cur_temp); Serial.println(" ºC");
     DHTSampleTimeMarker = millis();
   }
+}
+
+void tempLogLoop() {
   if (isTimeToUpdateTempLog()) {
     int8_t temperature = (int8_t) cur_temp;
     Serial.print("Saving temperature "); Serial.print(temperature); Serial.println(" ºC to graph.");
@@ -241,5 +246,26 @@ void loop(void) {
     next_sample = (next_sample + 1) % TEMP_SAMPLES; // round robin buffering
     temp5minSampleTimeMarker = millis();
   }
+}
+
+#define FINISHED_LOOP_INTERVAL_S 60 // interval in seconds when to take action on temperature control
+static unsigned long finishedLoopMarker = 0;
+#define isTimeToCheckFinished() ((millis() - finishedLoopMarker) > FINISHED_LOOP_INTERVAL_S * 1000)
+void finishedLoop() {
+  if (isTimeToCheckFinished()) {
+    finishedLoopMarker = millis();
+    if (cur_temp > target_temp - 1) {
+      warmMinutes ++;
+    }
+  }
+}
+
+void loop(void) {
+  server.handleClient();
+  tempSensorLoop();
+  tempCtrlLoop();
+  tempEmergencyLoop();
+  tempLogLoop();
+  finishedLoop();
   MDNS.update();
 }
