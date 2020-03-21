@@ -97,6 +97,7 @@ void handleRoot() {
     <p>Target Temperature: %3d deg. C</p>\
     <p>Current Max. Temperature: %3d deg. C</p>\
     <p>Current Heater Control Relais State: %3d</p>\
+    <p>Next Temperature Sample number: %3d</p>\
     <img src=\"/test.svg\" />\
   </body>\
 </html>",
@@ -106,7 +107,8 @@ void handleRoot() {
            cur_temp,
            target_temp,
            MAX_TEMP,
-           relais_state
+           relais_state,
+           next_sample
           );
   server.send(200, "text/html", temp);
   digitalWrite(led, 0);
