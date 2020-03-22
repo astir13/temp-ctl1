@@ -34,13 +34,13 @@
 #include <ESP8266mDNS.h>
 #include "DHTesp.h" // Temp sensor
 #include "Wire.h" //i2c
-#include <Adafruit_BMP280.h>
+#include "Adafruit_BMP280.h"
 
 Adafruit_BMP280 bmp;
 #define BMP_ADDR 118
 #define BMP_CHIP_ADDR 96
 
-#define I2C_SCAN
+//#define I2C_SCAN
 
 #ifdef ESP32
 #pragma message(THIS CODE IS FOR ESP8266 ONLY!)
