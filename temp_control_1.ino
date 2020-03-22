@@ -76,6 +76,8 @@ static unsigned long temp5minSampleTimeMarker = 0;
 
 float cur_temp = -100.0;
 int8_t target_temp = 25;  // default is 63 degrees Celsius
+uint8_t target_hours = 16; // how many hours before shut off
+bool target_reached = false;
 #define MAX_TEMP 65  // emergency temperature we never want to exceed
 #define HYSTERESIS 1  // ºC up and down from target temp when heating is switched on and off
 
@@ -237,25 +239,28 @@ void i2c_scan() {
 }
 #endif
 
+/* TURN HEATER ON/OFF */
 #define TEMP_CTRL_INTERVAL_S 30 // interval in seconds when to take action on temperature control
 static unsigned long TempCtrlMarker = 0;
 #define isTimeToCtrlTemp() ((millis() - TempCtrlMarker) > TEMP_CTRL_INTERVAL_S * 1000)
-
 void tempCtrlLoop() {
   if (isTimeToCtrlTemp()) {
     if (target_temp > MAX_TEMP) {
       target_temp = MAX_TEMP - 1;
     }
-    if (cur_temp > target_temp) {
+    if (target_reached || (cur_temp > target_temp)) {
       relais_state = 1;  // relais off
     } else {
-      if (cur_temp < target_temp) {
+      if ((cur_temp < target_temp) && !target_reached) {
         relais_state = 0;  // realis on
       }
     }
     digitalWrite(RELAIS, relais_state);
     Serial.print("Heat Relais in State: ");
     Serial.println(relais_state ? "off" : "on");
+    if (target_reached) {
+      Serial.println("because target is reached.");
+    }
     TempCtrlMarker = millis();
   }
 }
@@ -293,6 +298,10 @@ void finishedLoop() {
     finishedLoopMarker = millis();
     if (cur_temp >= target_temp - 2) {
       warmMinutes ++;
+    }
+    if (warmMinutes >= target_hours * 60) {
+      target_reached = true;
+      Serial.println("shutting off the heat, because we reached the target.");
     }
   }
 }
