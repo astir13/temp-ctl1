@@ -47,8 +47,8 @@ Adafruit_BMP280 bmp;
 #error Select ESP8266 board.
 #endif
 
-#define RELAIS D0
-bool relais_state = 0;
+#define RELAIS D0  // 0: on, 1: off
+bool relais_state = 1; // 1: off, 0: on
 
 #ifndef STASSID
 #define STASSID "mahewakan71"
@@ -75,8 +75,7 @@ static unsigned long temp5minSampleTimeMarker = 0;
 #define isTimeToUpdateTempLog() ((millis() - temp5minSampleTimeMarker) > 1 * 1000)
 
 float cur_temp = -100.0;
-float cur_hum = -100.0;
-int8_t target_temp = 63;  // default is 63 degrees Celsius
+int8_t target_temp = 25;  // default is 63 degrees Celsius
 #define MAX_TEMP 65  // emergency temperature we never want to exceed
 #define HYSTERESIS 1  // ºC up and down from target temp when heating is switched on and off
 
@@ -100,11 +99,10 @@ void handleRoot() {
   <body>\
     <h1>Temperature Curve since power on</h1>\
     <p>Uptime: %02d:%02d:%02d</p>\
-    <p>Current Humidity: %3.1f Percent</p>\
     <p>Current Temperature: %3.1f deg. C</p>\
     <p>Target Temperature: %3d deg. C</p>\
     <p>Current Max. Temperature: %3d deg. C</p>\
-    <p>Current Heater Control Relais State: %3d</p>\
+    <p>Current Heater Control Relais State: %s</p>\
     <p>Next Temperature Sample number: %3d</p>\
     <p>Minutes with Temperature >= target - 2 deg. C: %3d min.</p>\
     <img src=\"/test.svg\" />\
@@ -112,11 +110,10 @@ void handleRoot() {
 </html>",
 
            hr, min % 60, sec % 60, 
-           cur_hum,
            cur_temp,
            target_temp,
            MAX_TEMP,
-           relais_state,
+           relais_state ? "off" : "on",
            next_sample,
            warmMinutes
           );
@@ -173,9 +170,9 @@ void drawGraph() {
 
 void setup(void) {
   pinMode(LED, OUTPUT);
-  digitalWrite(LED, 0);
+  digitalWrite(LED, LOW);
   pinMode(RELAIS, OUTPUT);
-  digitalWrite(RELAIS, 0);
+  digitalWrite(RELAIS, HIGH);  // relais off
   Serial.begin(115200);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
@@ -219,14 +216,14 @@ void setup(void) {
   #if defined(I2C_SCAN)
   i2c_scan();
   #endif
-  if (!bmp.begin(BMP_ADDR, BMP_CHIP_ADDR)) {  
+  if (!bmp.begin(BMP_ADDR, BMP_CHIP_ADDR)) {
     Serial.print("Could not find a valid BMP280 sensor: chipid =");
     Serial.println(bmp.get_chip_id());
   } else {
     Serial.println("Successfully initialized BMP280");
   }
 }
-
+ 
 #if defined(I2C_SCAN)
 void i2c_scan() {
   Serial.println("Scanning i2c bus");
@@ -250,14 +247,15 @@ void tempCtrlLoop() {
       target_temp = MAX_TEMP - 1;
     }
     if (cur_temp > target_temp) {
-      relais_state = 0;
+      relais_state = 1;  // relais off
     } else {
       if (cur_temp < target_temp) {
-        relais_state = 1;
+        relais_state = 0;  // realis on
       }
     }
     digitalWrite(RELAIS, relais_state);
-    Serial.print("Heat Relais in State: "); Serial.println(relais_state);
+    Serial.print("Heat Relais in State: ");
+    Serial.println(relais_state ? "off" : "on");
     TempCtrlMarker = millis();
   }
 }
@@ -265,15 +263,13 @@ void tempCtrlLoop() {
 // ensure that relais is off if temp is exceeded, and sound alarm
 void tempEmergencyLoop() {
   if (cur_temp > MAX_TEMP) {
-    digitalWrite(RELAIS, LOW);
+    digitalWrite(RELAIS, HIGH);  // relais off
   }
 }
 
 void tempSensorLoop() {
   if (isTimeToSampleDHT()) {
-    cur_temp = bmp.readTemperature(); //dht.getTemperature();
-    cur_hum = dht.getHumidity();
-    Serial.print("Cur. Humidity measured to be: "); Serial.print(cur_hum); Serial.println(" %");
+    cur_temp = bmp.readTemperature();
     Serial.print("Cur. Temperature measured to be: "); Serial.print(cur_temp); Serial.println(" ºC");
     DHTSampleTimeMarker = millis();
   }
