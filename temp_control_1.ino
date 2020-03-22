@@ -33,6 +33,14 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include "DHTesp.h" // Temp sensor
+#include "Wire.h" //i2c
+#include <Adafruit_BMP280.h>
+
+Adafruit_BMP280 bmp;
+#define BMP_ADDR 118
+#define BMP_CHIP_ADDR 96
+
+#define I2C_SCAN
 
 #ifdef ESP32
 #pragma message(THIS CODE IS FOR ESP8266 ONLY!)
@@ -41,7 +49,6 @@
 
 #define RELAIS D0
 bool relais_state = 0;
-#define BEEPER D1
 
 #ifndef STASSID
 #define STASSID "mahewakan71"
@@ -65,7 +72,7 @@ static unsigned long warmMinutes = 0;
 int8_t temp_5min[TEMP_SAMPLES]; // 83 hours of temperature recordings 
 word next_sample = 0;
 static unsigned long temp5minSampleTimeMarker = 0;
-#define isTimeToUpdateTempLog() ((millis() - temp5minSampleTimeMarker) > 5 * 60 * 1000)
+#define isTimeToUpdateTempLog() ((millis() - temp5minSampleTimeMarker) > 1 * 1000)
 
 float cur_temp = -100.0;
 float cur_hum = -100.0;
@@ -99,7 +106,7 @@ void handleRoot() {
     <p>Current Max. Temperature: %3d deg. C</p>\
     <p>Current Heater Control Relais State: %3d</p>\
     <p>Next Temperature Sample number: %3d</p>\
-    <p>Minutes with Temperature > target - 1 deg. C: %3d min.</p>\
+    <p>Minutes with Temperature >= target - 2 deg. C: %3d min.</p>\
     <img src=\"/test.svg\" />\
   </body>\
 </html>",
@@ -138,21 +145,30 @@ void handleNotFound() {
 
 void drawGraph() {
   String out;
-  out.reserve(2600);
-  char temp[70];
-  out += "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" width=\"400\" height=\"150\">\n";
-  out += "<rect width=\"400\" height=\"150\" fill=\"rgb(250, 230, 210)\" stroke-width=\"1\" stroke=\"rgb(0, 0, 0)\" />\n";
-  out += "<g stroke=\"black\">\n";
-  int y = rand() % 130;
-  for (int x = 10; x < 390; x += 10) {
-    int y2 = rand() % 130;
-    sprintf(temp, "<line x1=\"%d\" y1=\"%d\" x2=\"%d\" y2=\"%d\" stroke-width=\"1\" />\n", x, 140 - y, x + 10, 140 - y2);
+  out.reserve(60000);
+  char temp[150];
+  out += "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" width=\"1200\" height=\"180\">\n";
+  out += "<rect x=\"20\" y=\"1\" width=\"1000\" height=\"150\" fill=\"rgb(250, 230, 210)\" stroke-width=\"2\" stroke=\"rgb(0, 0, 0)\" />\n";
+  sprintf(temp, "<line stroke-dasharray=\"5, 5\" x1=\"%d\" y1=\"%d\" x2=\"%d\" y2=\"%d\" stroke=\"red\" stroke-width=\"1\" />\n", 22, 145-(2* target_temp), 22 + 1000 - 2, 145-(2* target_temp));
+  out += temp;
+  for (int tmp = 10; tmp < 71; tmp += 20) {
+    sprintf(temp, "<text x=\"0\" y=\"%d\" fill=\"black\">%d</text>", 145-(2*tmp)+7, tmp);
     out += temp;
-    y = y2;
+    sprintf(temp, "<line stroke-dasharray=\"1, 5\" x1=\"%d\" y1=\"%d\" x2=\"%d\" y2=\"%d\" stroke=\"grey\" stroke-width=\"1\" />\n", 22, 145-(2* tmp), 22 + 1000 - 2, 145-(2* tmp));
+    out += temp;
   }
+  for (int min = 0; min < 1000; min += 60) {
+    sprintf(temp, "<text x=\"%d\" y=\"165\" fill=\"black\">%d</text>", min + 20, min);
+    out += temp;
+  }
+  out += "<g stroke=\"black\">\n";
+  for (int x = 1; x < next_sample; x++) {
+    sprintf(temp, "<line x1=\"%d\" y1=\"%d\" x2=\"%d\" y2=\"%d\" stroke-width=\"2\" />\n", x + 20, 145-(2*temp_5min[x-1]), x+1+20, 145-(2*temp_5min[x]));
+    out += temp;
+ }
   out += "</g>\n</svg>\n";
-
   server.send(200, "image/svg+xml", out);
+  Serial.print("Out buffer used:");Serial.println(out.length());
 }
 
 void setup(void) {
@@ -179,7 +195,7 @@ void setup(void) {
   Serial.println(WiFi.localIP());
 
   if (!MDNS.begin(MDNS_NAME)) {
-    Serial.println("Error setting up MDNS responder!");
+    Serial.println(F("Error setting up MDNS responder!"));
     while (1) {
       delay(1000);
     }
@@ -196,7 +212,33 @@ void setup(void) {
   server.onNotFound(handleNotFound);
   server.begin();
   Serial.println("HTTP server started");
+
+  //BMP280
+  Wire.begin(D2, D1);
+  Wire.setClock(10000); // 10KHz for cable length ~3m
+  #if defined(I2C_SCAN)
+  i2c_scan();
+  #endif
+  if (!bmp.begin(BMP_ADDR, BMP_CHIP_ADDR)) {  
+    Serial.print("Could not find a valid BMP280 sensor: chipid =");
+    Serial.println(bmp.get_chip_id());
+  } else {
+    Serial.println("Successfully initialized BMP280");
+  }
 }
+
+#if defined(I2C_SCAN)
+void i2c_scan() {
+  Serial.println("Scanning i2c bus");
+  for(uint8_t address = 1; address < 127; address++) {
+    Wire.beginTransmission(address);
+    if (! Wire.endTransmission()) {
+      Serial.print("I2C Device at DEC "); Serial.println(address);
+    }
+    delay(500);
+  }
+}
+#endif
 
 #define TEMP_CTRL_INTERVAL_S 30 // interval in seconds when to take action on temperature control
 static unsigned long TempCtrlMarker = 0;
@@ -224,13 +266,12 @@ void tempCtrlLoop() {
 void tempEmergencyLoop() {
   if (cur_temp > MAX_TEMP) {
     digitalWrite(RELAIS, LOW);
-    digitalWrite(BEEPER, HIGH);
   }
 }
 
 void tempSensorLoop() {
   if (isTimeToSampleDHT()) {
-    cur_temp = dht.getTemperature();
+    cur_temp = bmp.readTemperature(); //dht.getTemperature();
     cur_hum = dht.getHumidity();
     Serial.print("Cur. Humidity measured to be: "); Serial.print(cur_hum); Serial.println(" %");
     Serial.print("Cur. Temperature measured to be: "); Serial.print(cur_temp); Serial.println(" ºC");
@@ -254,7 +295,7 @@ static unsigned long finishedLoopMarker = 0;
 void finishedLoop() {
   if (isTimeToCheckFinished()) {
     finishedLoopMarker = millis();
-    if (cur_temp > target_temp - 1) {
+    if (cur_temp >= target_temp - 2) {
       warmMinutes ++;
     }
   }
