@@ -246,12 +246,12 @@ static unsigned long TempCtrlMarker = 0;
 void tempCtrlLoop() {
   if (isTimeToCtrlTemp()) {
     if (target_temp > MAX_TEMP) {
-      target_temp = MAX_TEMP - 1;
+      target_temp = MAX_TEMP - HYSTERESIS;
     }
-    if (target_reached || (cur_temp > target_temp)) {
+    if (target_reached || (cur_temp >= target_temp + HYSTERESIS)) {
       relais_state = 1;  // relais off
     } else {
-      if ((cur_temp < target_temp) && !target_reached) {
+      if ((cur_temp <= target_temp - HYSTERESIS) && !target_reached) {
         relais_state = 0;  // realis on
       }
     }
