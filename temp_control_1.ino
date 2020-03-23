@@ -72,10 +72,10 @@ static unsigned long warmMinutes = 0;
 int8_t temp_5min[TEMP_SAMPLES]; // 83 hours of temperature recordings 
 word next_sample = 0;
 static unsigned long temp5minSampleTimeMarker = 0;
-#define isTimeToUpdateTempLog() ((millis() - temp5minSampleTimeMarker) > 1 * 1000)
+#define isTimeToUpdateTempLog() ((millis() - temp5minSampleTimeMarker) > 5 * 60 * 1000)
 
 float cur_temp = -100.0;
-int8_t target_temp = 25;  // default is 63 degrees Celsius
+int8_t target_temp = 62;  // default is 63 degrees Celsius
 uint8_t target_hours = 16; // how many hours before shut off
 bool target_reached = false;
 #define MAX_TEMP 65  // emergency temperature we never want to exceed
