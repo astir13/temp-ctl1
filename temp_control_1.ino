@@ -100,6 +100,9 @@ void handleRoot() {
   </head>\
   <body>\
     <h1>Temperature Curve since power on</h1>\
+    <p>Registration: <input type=\"text\" value=\"OY-CBX\"/></p>\
+    <p>Part/location: <input type=\"text\" value=\"OY-CBX\"/></p>\
+    <p>Date: <input type=\"text\" value=\"OY-CBX\"/></p>\
     <p>Uptime: %02d:%02d:%02d</p>\
     <p>Current Temperature: %3.1f deg. C</p>\
     <p>Target Temperature: %3d deg. C</p>\
@@ -146,7 +149,9 @@ void drawGraph() {
   String out;
   out.reserve(30000);
   char temp[150];
-  out += "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" width=\"1200\" height=\"180\">\n";
+  out += "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" width=\"1200\" height=\"200\">\n";
+  out += "<text x=\"1000\" y=\"185\" fill=\"black\">hours</text>";
+  out += "<text x=\"0\" y=\"165\" fill=\"black\">&#8451;</text>";
   out += "<rect x=\"20\" y=\"1\" width=\"1000\" height=\"150\" fill=\"rgb(250, 230, 210)\" stroke-width=\"2\" stroke=\"rgb(0, 0, 0)\" />\n";
   sprintf(temp, "<line stroke-dasharray=\"5, 5\" x1=\"%d\" y1=\"%d\" x2=\"%d\" y2=\"%d\" stroke=\"red\" stroke-width=\"1\" />\n", 22, 145-(2* target_temp), 22 + 1000 - 2, 145-(2* target_temp));
   out += temp;
@@ -156,7 +161,7 @@ void drawGraph() {
     sprintf(temp, "<line stroke-dasharray=\"1, 5\" x1=\"%d\" y1=\"%d\" x2=\"%d\" y2=\"%d\" stroke=\"grey\" stroke-width=\"1\" />\n", 22, 145-(2* tmp), 22 + 1000 - 2, 145-(2* tmp));
     out += temp;
   }
-  for (int min = 0; min < TEMP_SAMPLES; min += 60) {
+  for (int min = 0; min < TEMP_SAMPLES * 5; min += 60) {
     sprintf(temp, "<text x=\"%d\" y=\"165\" fill=\"black\">%d</text>", min + 20, min / 60);
     out += temp;
   }
