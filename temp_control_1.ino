@@ -68,8 +68,8 @@ ESP8266WebServer server(80);
 #define LED 13
 static unsigned long warmMinutes = 0;
 
-#define TEMP_SAMPLES 1000
-int8_t temp_5min[TEMP_SAMPLES]; // 83 hours of temperature recordings 
+#define TEMP_SAMPLES 250
+int8_t temp_5min[TEMP_SAMPLES]; // 20 hours of temperature recordings 
 word next_sample = 0;
 static unsigned long temp5minSampleTimeMarker = 0;
 #define isTimeToUpdateTempLog() ((millis() - temp5minSampleTimeMarker) > 5 * 60 * 1000)
@@ -144,7 +144,7 @@ void handleNotFound() {
 
 void drawGraph() {
   String out;
-  out.reserve(60000);
+  out.reserve(30000);
   char temp[150];
   out += "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" width=\"1200\" height=\"180\">\n";
   out += "<rect x=\"20\" y=\"1\" width=\"1000\" height=\"150\" fill=\"rgb(250, 230, 210)\" stroke-width=\"2\" stroke=\"rgb(0, 0, 0)\" />\n";
@@ -156,13 +156,13 @@ void drawGraph() {
     sprintf(temp, "<line stroke-dasharray=\"1, 5\" x1=\"%d\" y1=\"%d\" x2=\"%d\" y2=\"%d\" stroke=\"grey\" stroke-width=\"1\" />\n", 22, 145-(2* tmp), 22 + 1000 - 2, 145-(2* tmp));
     out += temp;
   }
-  for (int min = 0; min < 1000; min += 60) {
-    sprintf(temp, "<text x=\"%d\" y=\"165\" fill=\"black\">%d</text>", min + 20, min);
+  for (int min = 0; min < TEMP_SAMPLES; min += 60) {
+    sprintf(temp, "<text x=\"%d\" y=\"165\" fill=\"black\">%d</text>", min + 20, min / 60);
     out += temp;
   }
   out += "<g stroke=\"black\">\n";
   for (int x = 1; x < next_sample; x++) {
-    sprintf(temp, "<line x1=\"%d\" y1=\"%d\" x2=\"%d\" y2=\"%d\" stroke-width=\"2\" />\n", x + 20, 145-(2*temp_5min[x-1]), x+1+20, 145-(2*temp_5min[x]));
+    sprintf(temp, "<line x1=\"%d\" y1=\"%d\" x2=\"%d\" y2=\"%d\" stroke-width=\"2\" />\n", (x * 5) + 20, 145-(2*temp_5min[x-1]), ((x+1) * 5) +20, 145-(2*temp_5min[x]));
     out += temp;
  }
   out += "</g>\n</svg>\n";
