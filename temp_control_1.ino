@@ -280,12 +280,13 @@ void tempSensorLoop() {
   }
 }
 
+// only record until buffer is full (20h)
 void tempLogLoop() {
-  if (isTimeToUpdateTempLog()) {
+  if ((next_sample <= TEMP_SAMPLES - 1) && isTimeToUpdateTempLog()) {
     int8_t temperature = (int8_t) cur_temp;
     Serial.print("Saving temperature "); Serial.print(temperature); Serial.println(" ºC to graph.");
     temp_5min[next_sample] = temperature;
-    next_sample = (next_sample + 1) % TEMP_SAMPLES; // round robin buffering
+    next_sample ++;
     temp5minSampleTimeMarker = millis();
   }
 }
