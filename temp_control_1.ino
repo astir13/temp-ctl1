@@ -68,7 +68,7 @@ ESP8266WebServer server(80);
 #define LED 13
 static unsigned long warmMinutes = 0;
 
-#define TEMP_SAMPLES 250
+#define TEMP_SAMPLES 200
 int8_t temp_5min[TEMP_SAMPLES]; // 20 hours of temperature recordings 
 word next_sample = 0;
 static unsigned long temp5minSampleTimeMarker = 0;
@@ -92,7 +92,7 @@ void handleRoot() {
 
            "<html>\
   <head>\
-    <meta http-equiv='refresh' content='5'/>\
+    <meta http-equiv='refresh' content='15'/>\
     <title>Temperature Curve for Temp controller</title>\
     <style>\
       body { background-color: #cccccc; font-family: Arial, Helvetica, Sans-Serif; Color: #000088; }\
@@ -101,8 +101,8 @@ void handleRoot() {
   <body>\
     <h1>Temperature Curve since power on</h1>\
     <p>Registration: <input type=\"text\" value=\"OY-CBX\"/></p>\
-    <p>Part/location: <input type=\"text\" value=\"OY-CBX\"/></p>\
-    <p>Date: <input type=\"text\" value=\"OY-CBX\"/></p>\
+    <p>Part/location: <input type=\"text\" value=\"right wing, root rib\"/></p>\
+    <p>Date: <input type=\"text\" value=\"2020-03-23\"/></p>\
     <p>Uptime: %02d:%02d:%02d</p>\
     <p>Current Temperature: %3.1f deg. C</p>\
     <p>Target Temperature: %3d deg. C</p>\
