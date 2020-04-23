@@ -1,4 +1,9 @@
 /*
+  Copyright (c) 2020, Stefan Pielmeier.
+  All rights reserved.
+
+  
+   Thanks for the example code of a web server:
    Copyright (c) 2015, Majenko Technologies
    All rights reserved.
 
@@ -32,15 +37,16 @@
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
-#include "DHTesp.h" // Temp sensor
-#include "Wire.h" //i2c
-#include "Adafruit_BMP280.h"
+#include <OneWire.h>
+#include <DallasTemperature.h>
 
-Adafruit_BMP280 bmp;
-#define BMP_ADDR 118
-#define BMP_CHIP_ADDR 96
+#define DS18B20_PIN D5
+// Setup a oneWire instance to communicate with any OneWire devices
+OneWire oneWire(DS18B20_PIN);
 
-//#define I2C_SCAN
+// Pass our oneWire reference to Dallas Temperature sensor 
+DallasTemperature sensors(&oneWire);
+
 
 #ifdef ESP32
 #pragma message(THIS CODE IS FOR ESP8266 ONLY!)
@@ -56,7 +62,7 @@ bool relais_state = 1; // 1: off, 0: on
 #endif
 #define MDNS_NAME "temp-ctl"
 
-DHTesp dht;
+
 static unsigned long DHTSampleTimeMarker = 0;
 #define isTimeToSampleDHT() ((millis() - DHTSampleTimeMarker) > 1000)
 
@@ -183,7 +189,7 @@ void setup(void) {
   Serial.begin(115200);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  dht.setup(D4, DHTesp::DHT11);
+  sensors.begin(); // Temp. sensor setup
   Serial.print("WIFI Setup:");
 
   // Wait for connection
@@ -216,33 +222,7 @@ void setup(void) {
   server.onNotFound(handleNotFound);
   server.begin();
   Serial.println("HTTP server started");
-
-  //BMP280
-  Wire.begin(D2, D1);
-  Wire.setClock(10000); // 10KHz for cable length ~3m
-  #if defined(I2C_SCAN)
-  i2c_scan();
-  #endif
-  if (!bmp.begin(BMP_ADDR, BMP_CHIP_ADDR)) {
-    Serial.print("Could not find a valid BMP280 sensor: chipid =");
-    Serial.println(bmp.get_chip_id());
-  } else {
-    Serial.println("Successfully initialized BMP280");
-  }
 }
- 
-#if defined(I2C_SCAN)
-void i2c_scan() {
-  Serial.println("Scanning i2c bus");
-  for(uint8_t address = 1; address < 127; address++) {
-    Wire.beginTransmission(address);
-    if (! Wire.endTransmission()) {
-      Serial.print("I2C Device at DEC "); Serial.println(address);
-    }
-    delay(500);
-  }
-}
-#endif
 
 /* TURN HEATER ON/OFF */
 #define TEMP_CTRL_INTERVAL_S 30 // interval in seconds when to take action on temperature control
@@ -279,7 +259,8 @@ void tempEmergencyLoop() {
 
 void tempSensorLoop() {
   if (isTimeToSampleDHT()) {
-    cur_temp = bmp.readTemperature();
+    sensors.requestTemperatures(); 
+    cur_temp = sensors.getTempCByIndex(0);
     Serial.print("Cur. Temperature measured to be: "); Serial.print(cur_temp); Serial.println(" ºC");
     DHTSampleTimeMarker = millis();
   }
