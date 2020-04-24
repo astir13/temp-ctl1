@@ -14,6 +14,11 @@
 * Erase Flash: Only Sketch
 * SSL Support: All SSL ciphers
 
+##Flashing:
+* connect the micro-USB cable to the NodeMCU and the PC you run Arduino on
+* with above settings, just press the upload button on the Arduino software
+* in case of trouble, go to Arduino settings and enable verbose output for compile and upload, that usually helps
+
 ##Harddware:
 * supply the NodeMCU with 5V on the Vcc pin
 * Have the temperature sensor DS18B20 connected to 3.3V and pin D5
