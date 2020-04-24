@@ -115,7 +115,8 @@ void handleRoot() {
     <p>Current Max. Temperature: %3d deg. C</p>\
     <p>Current Heater Control Relais State: %s</p>\
     <p>Next Temperature Sample number: %3d</p>\
-    <p>Minutes with Temperature >= target - 2 deg. C: %3d min.</p>\
+    <p>Hours with Temperature >= target - 2 deg. C: %3.1f hr.</p>\
+    <p>Target time reached: %s</p>\
     <img src=\"/test.svg\" />\
   </body>\
 </html>",
@@ -126,7 +127,8 @@ void handleRoot() {
            MAX_TEMP,
            relais_state ? "off" : "on",
            next_sample,
-           warmMinutes
+           warmMinutes / 60,
+           target_reached ? "yes, stopped heating" : "not reached, still heating"
           );
   server.send(200, "text/html", temp);
   digitalWrite(LED, 0);
@@ -292,7 +294,7 @@ void tempSensorLoop() {
   }
 }
 
-// only record until buffer is full (20h)
+// only record until buffer is full
 void tempLogLoop() {
   if ((next_sample <= TEMP_SAMPLES - 1) && isTimeToUpdateTempLog()) {
     int8_t temperature = (int8_t) cur_temp;
