@@ -40,6 +40,8 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
+#define FW_VERSION "1.00_20200423-008"
+
 #define DS18B20_PIN D5
 // Setup a oneWire instance to communicate with any OneWire devices
 OneWire oneWire(DS18B20_PIN);
@@ -94,11 +96,10 @@ void handleRoot() {
   int min = sec / 60;
   int hr = min / 60;
 
-  snprintf(temp, 1400,
+  snprintf(temp, 2000,
 
            "<html>\
   <head>\
-    <meta http-equiv='refresh' content='15'/>\
     <title>Temperature Curve for Temp controller</title>\
     <style>\
       body { background-color: #cccccc; font-family: Arial, Helvetica, Sans-Serif; Color: #000088; }\
@@ -106,6 +107,7 @@ void handleRoot() {
   </head>\
   <body>\
     <h1>Temperature Curve since power on</h1>\
+    <p>Firmware Version: %s</p>\
     <p>Registration: <input type=\"text\" value=\"OY-CBX\"/></p>\
     <p>Part/location: <input type=\"text\" value=\"right wing, root rib\"/></p>\
     <p>Date: <input type=\"text\" value=\"2020-03-23\"/></p>\
@@ -118,16 +120,17 @@ void handleRoot() {
     <p>Hours with Temperature >= target - 2 deg. C: %3.1f hr.</p>\
     <p>Target time reached: %s</p>\
     <img src=\"/test.svg\" />\
+    <button onClick=\"window.location.reload();\">Refresh Page</button>\
   </body>\
 </html>",
-
+           FW_VERSION,
            hr, min % 60, sec % 60, 
            cur_temp,
            target_temp,
            MAX_TEMP,
            relais_state ? "off" : "on",
            next_sample,
-           warmMinutes / 60,
+           (float)warmMinutes / 60.0,
            target_reached ? "yes, stopped heating" : "not reached, still heating"
           );
   server.send(200, "text/html", temp);
@@ -192,14 +195,18 @@ void setup(void) {
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   sensors.begin(); // Temp. sensor setup
+  Serial.println("");
+  Serial.println("Temp Control by stefan@symlinux.com");
+  Serial.print("Version:");
+  Serial.println(FW_VERSION);
   Serial.print("WIFI Setup:");
 
   // Wait for connection + 10 sec. timeout
-  long startTime = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - startTime < 10000) {
-    delay(500);
-    Serial.print(".");
-  }
+  //long startTime = millis();
+  //while (WiFi.status() != WL_CONNECTED && millis() - startTime < 10000) {
+  //  delay(500);
+  //  Serial.print(".");
+  //}
   
   // Check connection
   if(WiFi.status() == WL_CONNECTED)
