@@ -192,17 +192,42 @@ void setup(void) {
   sensors.begin(); // Temp. sensor setup
   Serial.print("WIFI Setup:");
 
-  // Wait for connection
-  while (WiFi.status() != WL_CONNECTED) {
+  // Wait for connection + 10 sec. timeout
+  long startTime = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - startTime < 10000) {
     delay(500);
     Serial.print(".");
   }
+  
+  // Check connection
+  if(WiFi.status() == WL_CONNECTED)
+  {
+    Serial.println("");
+    Serial.print("Connected to ");
+    Serial.println(ssid);
+    Serial.print(F("IP address: "));
+    Serial.println(WiFi.localIP());
+  }
+  else
+  {
+    Serial.println(F("Can not connect to WiFi station. Go into AP mode."));
+    
+    // Go into software AP mode.
+    WiFi.mode(WIFI_AP);
+    delay(10);
 
-  Serial.println("");
-  Serial.print("Connected to ");
-  Serial.println(ssid);
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
+    Serial.print(F("Setting soft-AP configuration ... "));
+    Serial.println(WiFi.softAPConfig(IPAddress(192,168,236,1), // IP
+                                     IPAddress(192,168,236,1), //gateway
+                                     IPAddress(255,255,255,0)) ? //subnet
+      F("Ready") : F("Failed!"));
+
+    Serial.print(F("Setting soft-AP ... "));
+    Serial.println(WiFi.softAP("temp-ctl", "GHijK345") ?
+      F("Ready") : F("Failed!"));
+    Serial.print(F("IP address: "));
+    Serial.println(WiFi.softAPIP());
+  }
 
   if (!MDNS.begin(MDNS_NAME)) {
     Serial.println(F("Error setting up MDNS responder!"));
@@ -210,6 +235,7 @@ void setup(void) {
       delay(1000);
     }
   }
+  
   MDNS.addService("http", "tcp", 80);
   Serial.print("mDNS responder started: ");
   Serial.println(MDNS_NAME);
