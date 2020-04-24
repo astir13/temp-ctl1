@@ -37,8 +37,8 @@
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
-#include <OneWire.h>
-#include <DallasTemperature.h>
+#include <OneWire.h>  // OneWire by Jim Studt 2.3.5
+#include <DallasTemperature.h>  // DallasTemperature by Miles Burton 3.8.0
 
 #define FW_VERSION "1.00_20200423-008"
 
@@ -58,18 +58,20 @@ DallasTemperature sensors(&oneWire);
 #define RELAIS D0  // 0: on, 1: off
 bool relais_state = 1; // 1: off, 0: on
 
-#ifndef STASSID
-#define STASSID "mahewakan71"
-#define STAPSK  "EinHaseSprangUbersHaus"
+// for development, use that code
+//#define STASSID "MyAccessPointAtMyLab"
+//#define STAPSK  "MyPassword"
+#ifdef STASSID
+const char *ssid = STASSID;
+const char *password = STAPSK;
 #endif
+
 #define MDNS_NAME "temp-ctl"
 
 
 static unsigned long DHTSampleTimeMarker = 0;
 #define isTimeToSampleDHT() ((millis() - DHTSampleTimeMarker) > 1000)
 
-const char *ssid = STASSID;
-const char *password = STAPSK;
 
 ESP8266WebServer server(80);
 
@@ -192,8 +194,6 @@ void setup(void) {
   pinMode(RELAIS, OUTPUT);
   digitalWrite(RELAIS, HIGH);  // relais off
   Serial.begin(115200);
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
   sensors.begin(); // Temp. sensor setup
   Serial.println("");
   Serial.println("Temp Control by stefan@symlinux.com");
@@ -201,12 +201,15 @@ void setup(void) {
   Serial.println(FW_VERSION);
   Serial.print("WIFI Setup:");
 
+#ifdef STASSID  // used under development
   // Wait for connection + 10 sec. timeout
-  //long startTime = millis();
-  //while (WiFi.status() != WL_CONNECTED && millis() - startTime < 10000) {
-  //  delay(500);
-  //  Serial.print(".");
-  //}
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  long startTime = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - startTime < 10000) {
+    delay(500);
+    Serial.print(".");
+  }
   
   // Check connection
   if(WiFi.status() == WL_CONNECTED)
@@ -218,6 +221,7 @@ void setup(void) {
     Serial.println(WiFi.localIP());
   }
   else
+#endif
   {
     Serial.println(F("Can not connect to WiFi station. Go into AP mode."));
     
