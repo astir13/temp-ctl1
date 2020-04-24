@@ -1,6 +1,6 @@
-Temperature Control with Arduinto on NodeMCU
+#Temperature Control with Arduinto on NodeMCU
 
-Arduino Settings:
+##Arduino Settings:
 * using Arduino 1.8.12
 * set target as NodeMCU 1.0 ESP-12E
 * Upload Speed 115200
@@ -14,12 +14,12 @@ Arduino Settings:
 * Erase Flash: Only Sketch
 * SSL Support: All SSL ciphers
 
-Harddware:
+##Harddware:
 * supply the NodeMCU with 5V on the Vcc pin
 * Have the temperature sensor DS18B20 connected to 3.3V and pin D5
 * Have the relais (low = heating on) connected to pin D0
 
-Disclaimer:
+##Disclaimer:
 * always stay in the same room as the temperature controller
 * do not leave the temperature controller alone
 * always use heating elements that cannot burn
@@ -29,7 +29,7 @@ Disclaimer:
 * always place the sensor in the same air compartement as the heating
 * the copyright owners or github cannot take any responsibility for damages, even in the case where the software has a bug
 
-Reporting:
+##Reporting:
 * if you report a bug or a feature request, copy/paste following template into the github issue:
 ** observation: <describe what you observed>
 ** expected behaviour: <describe what you expected to happen from the software>
@@ -38,17 +38,17 @@ Reporting:
 ** proposed solution: <please propose how to solve the problem, point me to a pull request or branch>
 ** hardware description: <please provide relevant hardware description, at minimum arduino platform, sensor type, and a screenshot of the web interface when the problem appears>
 
-Usage:
+##Usage:
 * start the Arduino
 * connect to the WIFI AP of the Arduino called "temp-ctl", find the password in the code, you may want to edit it (around line 239)
 * open the web browser at http://192.168.236.1/ and press the refresh button to refresh the screen
 * there will be a 30 second delay before the Arduino switches the realy on, verify on the web i/f and with your ovens
-* the oven will stop after 16 hours @ 60 ÂC, you can change that code, but be aware of memory consequences
+* the oven will stop after 16 hours @ 60 Ã‚C, you can change that code, but be aware of memory consequences
 * the temp courve drawing will stop after the chart is full
 * when done, you can push the refresh button a last time on the web i/f, then edit the fields with free values you need for your documentation
 * then print the page
 * refreshing will show the example values again
 
-Limitations:
+##Limitations:
 * a power reset will reset the memory, you start anew
 * you cannot change any parameters via the web interface
