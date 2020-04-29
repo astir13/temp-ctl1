@@ -78,7 +78,8 @@ const char *password = STAPSK;
 
 
 static unsigned long DHTSampleTimeMarker = 0;
-#define isTimeToSampleDHT() ((millis() - DHTSampleTimeMarker) > 1000)
+#define TEMP_SAMPLE_INTERVAL_S 5  // seconds between temperature samples.
+#define isTimeToSampleDHT() ((millis() - DHTSampleTimeMarker) > (TEMP_SAMPLE_INTERVAL_S * 1000))
 
 
 ESP8266WebServer server(80);
@@ -94,7 +95,7 @@ static unsigned long temp5minSampleTimeMarker = 0;
 
 float cur_temp = -100.0;
 float cur_temp_rate_m = 0; // °C/minute change rate 
-#define HIST_TEMP_S 20  // seconds for the history buffer used to calc. rate
+#define HIST_TEMP_S 4  // samples for the temp history buffer used to calc. rate
 float hist_temp[HIST_TEMP_S]; // historical temperature buffer
 uint8_t hist_temp_pntr = 0; // historial temperature buffer pointer
 bool hist_temp_initialized = false; // indicates weather the first rate can be calculated
@@ -365,7 +366,7 @@ void tempSensorLoop() {
         hist_temp_initialized = true;
       }
       if (hist_temp_initialized) {
-        cur_temp_rate_m = (hist_temp[(hist_temp_pntr - 1) % HIST_TEMP_S] - hist_temp[hist_temp_pntr % HIST_TEMP_S]) * 3;  // minute rate in °C
+        cur_temp_rate_m = (hist_temp[(hist_temp_pntr - 1) % HIST_TEMP_S] - hist_temp[hist_temp_pntr % HIST_TEMP_S]) * (60.0 / TEMP_SAMPLE_INTERVAL_S / HIST_TEMP_S);  // minute rate in °C
         Serial.print("cur_temp_rate_m ="); Serial.print(cur_temp_rate_m);Serial.println("°C/min.");
       }
     }
