@@ -40,7 +40,7 @@
 #include <OneWire.h>  // OneWire by Jim Studt 2.3.5
 #include <DallasTemperature.h>  // DallasTemperature by Miles Burton 3.8.0
 
-#define FW_VERSION "1.00_20200420-002"
+#define FW_VERSION "1.00_20200429-008"
 
 // a well protected error variable (start of memory)
 #define MAX_ERROR_LENGTH 150
