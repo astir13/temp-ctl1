@@ -93,6 +93,11 @@ static unsigned long temp5minSampleTimeMarker = 0;
 #define isTimeToUpdateTempLog() ((millis() - temp5minSampleTimeMarker) > 5 * 60 * 1000)
 
 float cur_temp = -100.0;
+float cur_temp_rate_m = 0; // °C/minute change rate 
+#define HIST_TEMP_S 20  // seconds for the history buffer used to calc. rate
+float hist_temp[HIST_TEMP_S]; // historical temperature buffer
+uint8_t hist_temp_pntr = 0; // historial temperature buffer pointer
+bool hist_temp_initialized = false; // indicates weather the first rate can be calculated
 int8_t target_temp = 62;  // default is 63 degrees Celsius
 #define TARGET_TOLERANCE 4 // °C tolerance to count warm minutes
 uint8_t target_hours = 16; // how many hours before shut off
@@ -353,6 +358,17 @@ void tempSensorLoop() {
       }
     }
     DHTSampleTimeMarker = millis();
+    if (cur_temp > -100) {
+      hist_temp[hist_temp_pntr % HIST_TEMP_S] = cur_temp;
+      hist_temp_pntr++;
+      if (!hist_temp_initialized && hist_temp_pntr >= HIST_TEMP_S) {
+        hist_temp_initialized = true;
+      }
+      if (hist_temp_initialized) {
+        cur_temp_rate_m = (hist_temp[(hist_temp_pntr - 1) % HIST_TEMP_S] - hist_temp[hist_temp_pntr % HIST_TEMP_S]) * 3;  // minute rate in °C
+        Serial.print("cur_temp_rate_m ="); Serial.print(cur_temp_rate_m);Serial.println("°C/min.");
+      }
+    }
   }
 }
 
