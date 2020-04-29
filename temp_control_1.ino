@@ -40,7 +40,7 @@
 #include <OneWire.h>  // OneWire by Jim Studt 2.3.5
 #include <DallasTemperature.h>  // DallasTemperature by Miles Burton 3.8.0
 
-#define FW_VERSION "1.00_20200429-008"
+#define FW_VERSION "1.00_20200429-009"
 
 // a well protected error variable (start of memory)
 #define MAX_ERROR_LENGTH 150
@@ -67,7 +67,7 @@ DallasTemperature sensors(&oneWire);
 bool relais_state = 1; // 1: off, 0: on
 
 // Heater dynamics
-#define HEATER_OFF_DELAY_M 1  // minutes before switching off the heater shows effect
+#define HEATER_OFF_DELAY_M 2.5  // minutes before switching off the heater shows effect
 #define HEATER_ON_DELAY_M 5 // minutes before switching on the heater shows effect
 
 // for development, use that code
@@ -108,7 +108,7 @@ int8_t target_temp = 62;  // default is 63 degrees Celsius
 uint8_t target_hours = 16; // how many hours before shut off
 bool target_reached = false;
 #define MAX_TEMP 65  // emergency temperature we never want to exceed
-#define HYSTERESIS 0  // ºC up and down from target temp when heating is switched on and off
+#define HYSTERESIS 0.2  // ºC up and down from target temp when heating is switched on and off
 
 void handleRoot() {
   digitalWrite(LED, 1);
