@@ -94,6 +94,7 @@ static unsigned long temp5minSampleTimeMarker = 0;
 
 float cur_temp = -100.0;
 int8_t target_temp = 62;  // default is 63 degrees Celsius
+#define TARGET_TOLERANCE 4 // °C tolerance to count warm minutes
 uint8_t target_hours = 16; // how many hours before shut off
 bool target_reached = false;
 #define MAX_TEMP 65  // emergency temperature we never want to exceed
@@ -129,7 +130,7 @@ void handleRoot() {
     <p>Current Max. Temperature: %3d deg. C</p>\
     <p>Current Heater Control Relais State: %s</p>\
     <p>Next Temperature Sample number: %3d</p>\
-    <p>Hours with Temperature >= target - 2 deg. C: %3.1f hr.</p>\
+    <p>Hours with Temperature >= target - %d deg. C: %3.1f hr.</p>\
     <p>Target time reached: %s</p>\
     <img src=\"/test.svg\" />\
     <button onClick=\"window.location.reload();\">Refresh Page</button>\
@@ -144,6 +145,7 @@ void handleRoot() {
            MAX_TEMP,
            relais_state ? "off" : "on",
            next_sample,
+           TARGET_TOLERANCE,
            (float)warmMinutes / 60.0,
            target_reached ? "yes, stopped heating" : "not reached, still heating"
           );
@@ -365,7 +367,7 @@ static unsigned long finishedLoopMarker = 0;
 void finishedLoop() {
   if (isTimeToCheckFinished()) {
     finishedLoopMarker = millis();
-    if (cur_temp >= target_temp - 2) {
+    if (cur_temp >= target_temp - TARGET_TOLERANCE) {
       warmMinutes ++;
     }
     if (warmMinutes >= target_hours * 60) {
