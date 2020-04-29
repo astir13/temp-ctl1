@@ -108,7 +108,7 @@ int8_t target_temp = 62;  // default is 63 degrees Celsius
 uint8_t target_hours = 16; // how many hours before shut off
 bool target_reached = false;
 #define MAX_TEMP 65  // emergency temperature we never want to exceed
-#define HYSTERESIS 1  // ºC up and down from target temp when heating is switched on and off
+#define HYSTERESIS 0  // ºC up and down from target temp when heating is switched on and off
 
 void handleRoot() {
   digitalWrite(LED, 1);
