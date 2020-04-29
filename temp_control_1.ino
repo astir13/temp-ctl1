@@ -325,15 +325,20 @@ void tempSensorLoop() {
       long start_time = millis();
       sensor_retry_count++;
       while (start_time + (MAX_RETRY_S * 1000) > millis()) {
+        Serial.println("try oneWire.reset");
         if (oneWire.reset()) {
           sprintf(error, "OneWire.reset(): found a sensor.");
+          Serial.println("try oneWire.reset_search()");
           oneWire.reset_search();
           uint8_t address;
+          Serial.println("try oneWire.search()");
           if (oneWire.search(&address)) {
             sprintf(error, "OneWire.search(): found a sensor.");
           }
           sensors.begin();
+          Serial.println("try sensors.requestTemperatures()");
           sensors.requestTemperatures();
+          Serial.println("try sensors.getTempCByIndex");
           if (float temp = sensors.getTempCByIndex(0) > DALLAS_ERROR_TEMP) {
             error_flag = false;
             sprintf(error, "[W]arn: recovered from sensor error. Could get temperature: %f", temp);
