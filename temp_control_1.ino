@@ -49,6 +49,8 @@ bool error_flag = false;  // if true, the system is in error
 
 #define DS18B20_PIN D5
 #define DALLAS_ERROR_TEMP -127  // Dallas lib. indicates sensor disconnected
+long sensor_retry_count = 0;  // count problems with this sensor
+
 // Setup a oneWire instance to communicate with any OneWire devices
 OneWire oneWire(DS18B20_PIN);
 
@@ -115,7 +117,8 @@ void handleRoot() {
   </head>\
   <body>\
     <h1>Temperature Curve since power on</h1>\
-    <h2 style=\"color:red;\">%s</h2>\ 
+    <h2 style=\"color:red;\">%s</h2>\
+    <p>sensor retries: %d</p>\
     <p>Firmware Version: %s</p>\
     <p>Registration: <input type=\"text\" value=\"OY-CBX\"/></p>\
     <p>Part/location: <input type=\"text\" value=\"right wing, root rib\"/></p>\
@@ -133,6 +136,7 @@ void handleRoot() {
   </body>\
 </html>",
            error,
+           sensor_retry_count,
            FW_VERSION,
            hr, min % 60, sec % 60, 
            cur_temp,
@@ -304,6 +308,7 @@ void tempEmergencyLoop() {
   }
 }
 
+#define MAX_RETRY_S 10  // seconds to retry sensor connection in case it is disconnected
 void tempSensorLoop() {
   if (isTimeToSampleDHT()) {
     sensors.requestTemperatures();
@@ -312,9 +317,32 @@ void tempSensorLoop() {
       cur_temp = sensor_temp;
       Serial.print("Cur. Temperature measured to be: "); Serial.print(cur_temp); Serial.println(" ºC");
     } else {
-      Serial.println("[E]RROR: could not read temperature from sensor");
+      Serial.println("[E]RROR: could not read temperature from sensor, but will try again.");
       sprintf(error, "Sensor Error, could not read temperature\n");
       error_flag = true;
+      long start_time = millis();
+      sensor_retry_count++;
+      while (start_time + (MAX_RETRY_S * 1000) > millis()) {
+        if (oneWire.reset()) {
+          sprintf(error, "OneWire.reset(): found a sensor.");
+          oneWire.reset_search();
+          uint8_t address;
+          if (oneWire.search(&address)) {
+            sprintf(error, "OneWire.search(): found a sensor.");
+          }
+          sensors.begin();
+          sensors.requestTemperatures();
+          if (float temp = sensors.getTempCByIndex(0) > DALLAS_ERROR_TEMP) {
+            error_flag = false;
+            sprintf(error, "[W]arn: recovered from sensor error. Could get temperature: %f", temp);
+            cur_temp = temp;
+            break; // leave the while loop
+          }
+          delay(1000);
+        } else {
+          sprintf(error, "OneWire.reset(): Didn't get temperature, didn't find a sensor. Cabling or power defect?");
+        }
+      }
     }
     DHTSampleTimeMarker = millis();
   }
