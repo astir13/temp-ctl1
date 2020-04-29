@@ -66,6 +66,10 @@ DallasTemperature sensors(&oneWire);
 #define RELAIS D0  // 0: on, 1: off
 bool relais_state = 1; // 1: off, 0: on
 
+// Heater dynamics
+#define HEATER_OFF_DELAY_M 1  // minutes before switching off the heater shows effect
+#define HEATER_ON_DELAY_M 5 // minutes before switching on the heater shows effect
+
 // for development, use that code
 //#define STASSID "MyAccessPointAtMyLab"
 //#define STAPSK  "MyPassword"
@@ -292,10 +296,10 @@ void tempCtrlLoop() {
     if (target_temp > MAX_TEMP) {  // protection against memory overwriting
       target_temp = MAX_TEMP - HYSTERESIS;
     }
-    if (error_flag || target_reached || (cur_temp >= target_temp + HYSTERESIS)) {
+    if (relais_state == 0 && (error_flag || target_reached || (cur_temp + (cur_temp_rate_m * HEATER_OFF_DELAY_M) >= target_temp + HYSTERESIS))) {
       relais_state = 1;  // relais off
     } else {
-      if ((cur_temp <= target_temp - HYSTERESIS) && !target_reached) {
+      if (relais_state == 1 && !target_reached && (cur_temp + (cur_temp_rate_m * HEATER_ON_DELAY_M) <= target_temp - HYSTERESIS)) {
         relais_state = 0;  // realis on
       }
     }
