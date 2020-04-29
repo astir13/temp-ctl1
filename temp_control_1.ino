@@ -42,7 +42,13 @@
 
 #define FW_VERSION "1.00_20200423-008"
 
+// a well protected error variable (start of memory)
+#define MAX_ERROR_LENGTH 150
+char error[MAX_ERROR_LENGTH] = "";
+bool error_flag = false;  // if true, the system is in error
+
 #define DS18B20_PIN D5
+#define DALLAS_ERROR_TEMP -127  // Dallas lib. indicates sensor disconnected
 // Setup a oneWire instance to communicate with any OneWire devices
 OneWire oneWire(DS18B20_PIN);
 
@@ -109,6 +115,7 @@ void handleRoot() {
   </head>\
   <body>\
     <h1>Temperature Curve since power on</h1>\
+    <h2 style=\"color:red;\">%s</h2>\ 
     <p>Firmware Version: %s</p>\
     <p>Registration: <input type=\"text\" value=\"OY-CBX\"/></p>\
     <p>Part/location: <input type=\"text\" value=\"right wing, root rib\"/></p>\
@@ -125,6 +132,7 @@ void handleRoot() {
     <button onClick=\"window.location.reload();\">Refresh Page</button>\
   </body>\
 </html>",
+           error,
            FW_VERSION,
            hr, min % 60, sec % 60, 
            cur_temp,
@@ -269,10 +277,10 @@ static unsigned long TempCtrlMarker = 0;
 #define isTimeToCtrlTemp() ((millis() - TempCtrlMarker) > TEMP_CTRL_INTERVAL_S * 1000)
 void tempCtrlLoop() {
   if (isTimeToCtrlTemp()) {
-    if (target_temp > MAX_TEMP) {
+    if (target_temp > MAX_TEMP) {  // protection against memory overwriting
       target_temp = MAX_TEMP - HYSTERESIS;
     }
-    if (target_reached || (cur_temp >= target_temp + HYSTERESIS)) {
+    if (error_flag || target_reached || (cur_temp >= target_temp + HYSTERESIS)) {
       relais_state = 1;  // relais off
     } else {
       if ((cur_temp <= target_temp - HYSTERESIS) && !target_reached) {
@@ -291,16 +299,23 @@ void tempCtrlLoop() {
 
 // ensure that relais is off if temp is exceeded, and sound alarm
 void tempEmergencyLoop() {
-  if (cur_temp > MAX_TEMP) {
+  if (error_flag || cur_temp > MAX_TEMP) {
     digitalWrite(RELAIS, HIGH);  // relais off
   }
 }
 
 void tempSensorLoop() {
   if (isTimeToSampleDHT()) {
-    sensors.requestTemperatures(); 
-    cur_temp = sensors.getTempCByIndex(0);
-    Serial.print("Cur. Temperature measured to be: "); Serial.print(cur_temp); Serial.println(" ºC");
+    sensors.requestTemperatures();
+    float sensor_temp = sensors.getTempCByIndex(0);
+    if (sensor_temp > DALLAS_ERROR_TEMP) {
+      cur_temp = sensor_temp;
+      Serial.print("Cur. Temperature measured to be: "); Serial.print(cur_temp); Serial.println(" ºC");
+    } else {
+      Serial.println("[E]RROR: could not read temperature from sensor");
+      sprintf(error, "Sensor Error, could not read temperature\n");
+      error_flag = true;
+    }
     DHTSampleTimeMarker = millis();
   }
 }
