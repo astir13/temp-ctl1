@@ -345,10 +345,11 @@ void tempSensorLoop() {
             cur_temp = temp;
             break; // leave the while loop
           }
-          delay(1000);
         } else {
           sprintf(error, "OneWire.reset(): Didn't get temperature, didn't find a sensor. Cabling or power defect?");
+          Serial.println("OneWire.reset(): Sensor did not answer.");
         }
+        delay(500);
       }
     }
     DHTSampleTimeMarker = millis();
