@@ -40,7 +40,7 @@
 #include <OneWire.h>  // OneWire by Jim Studt 2.3.5
 #include <DallasTemperature.h>  // DallasTemperature by Miles Burton 3.8.0
 
-#define FW_VERSION "1.00_20200430-001"
+#define FW_VERSION "1.00_20200429-009"
 
 // a well protected error variable (start of memory)
 #define MAX_ERROR_LENGTH 150
@@ -354,11 +354,9 @@ void tempSensorLoop() {
   if (isTimeToSampleDHT()) {
     sensor_temp_sum = 0;
     sensor_temp_success = 0;
-    for (int i = 0; i < SENSOR_TEMP_SIZE; i++){
+    for (sensor_temp_success = 0; sensor_temp_success < SENSOR_TEMP_SIZE; sensor_temp_success++){
       sensors.requestTemperatures();
-      float sense = sensors.getTempCByIndex(0);
-      if (sense > DALLAS_ERROR_TEMP) {
-        Serial.print("Sensor measurment:");Serial.print(sense);Serial.println(" °C");
+      if (float sense = sensors.getTempCByIndex(0) > DALLAS_ERROR_TEMP) {
         sensor_temp_sum += sense;
         sensor_temp_success ++;
       } else {
@@ -398,9 +396,9 @@ void tempSensorLoop() {
           delay(500);
         }
       }
+      cur_temp = sensor_temp_sum/sensor_temp_success;
+      Serial.print("Current measured temperature:");Serial.print(cur_temp);Serial.println("°C");
     }
-    cur_temp = sensor_temp_sum/sensor_temp_success;
-    Serial.print("Current measured temperature: ");Serial.print(cur_temp);Serial.println(" °C");
     DHTSampleTimeMarker = millis();
     calc_cur_temp_rate();
   }
