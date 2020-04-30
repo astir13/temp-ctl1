@@ -347,6 +347,7 @@ void calc_temp_rate() {
 #define MAX_RETRY_S 10  // seconds to retry sensor connection in case it is disconnected
 void tempSensorLoop() {
   if (isTimeToSampleDHT()) {
+    DHTSampleTimeMarker = millis();
     sensors.requestTemperatures();
     float sensor_temp = sensors.getTempCByIndex(0);
     if (sensor_temp > DALLAS_ERROR_TEMP) {
@@ -388,7 +389,6 @@ void tempSensorLoop() {
         delay(500);
       }
     }
-    DHTSampleTimeMarker = millis();
     calc_temp_rate();
   }
 }
