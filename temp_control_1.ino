@@ -332,13 +332,13 @@ void tempEmergencyLoop() {
 
 void calc_temp_rate() {
   if (cur_temp > -100) {
-    hist_temp[hist_temp_pntr % HIST_TEMP_S] = cur_temp;
+    hist_temp[hist_temp_pntr % HIST_TEMP_S] = cur_temp; // store cur_temp into buffer
     hist_temp_pntr++;
-    if (!hist_temp_initialized && hist_temp_pntr >= HIST_TEMP_S) {
+    if (!hist_temp_initialized && hist_temp_pntr >= HIST_TEMP_S) {  // state machine that enables calc after start when 4 values inside
       hist_temp_initialized = true;
     }
     if (hist_temp_initialized) {
-      cur_temp_rate_m = (hist_temp[(hist_temp_pntr - 1) % HIST_TEMP_S] - hist_temp[hist_temp_pntr % HIST_TEMP_S]) * (60.0 / TEMP_SAMPLE_INTERVAL_S / HIST_TEMP_S);  // minute rate in °C
+      cur_temp_rate_m = (cur_temp - hist_temp[hist_temp_pntr % HIST_TEMP_S]) * (60.0 / TEMP_SAMPLE_INTERVAL_S / HIST_TEMP_S);  // minute rate in °C
       Serial.print("cur_temp_rate_m ="); Serial.print(cur_temp_rate_m);Serial.println("°C/min.");
     }
   }
