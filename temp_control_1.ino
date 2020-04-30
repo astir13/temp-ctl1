@@ -47,7 +47,8 @@
 char error[MAX_ERROR_LENGTH] = "";
 bool error_flag = false;  // if true, the system is in error
 
-#define DS18B20_PIN D5
+#define DS18B20_PIN D5  // DATA pin
+#define DS18B20_PWR D4  // used to provide sensor with controllable power
 #define DALLAS_ERROR_TEMP -127  // Dallas lib. indicates sensor disconnected
 long sensor_retry_count = 0;  // count problems with this sensor
 
@@ -212,11 +213,20 @@ void drawGraph() {
   Serial.print("Out buffer used:");Serial.println(out.length());
 }
 
+// issue a power reset with 5 seconds pause to the sensor
+void ds18b20_pwr_reset() {
+  digitalWrite(DS18B20_PWR, LOW);
+  delay(5000);
+  digitalWrite(DS18B20_PWR, HIGH);
+}
+
 void setup(void) {
   pinMode(LED, OUTPUT);
   digitalWrite(LED, LOW);
   pinMode(RELAIS, OUTPUT);
   digitalWrite(RELAIS, HIGH);  // relais off
+  pinMode(DS18B20_PWR, OUTPUT);
+  ds18b20_pwr_reset();
   Serial.begin(115200);
   sensors.begin(); // Temp. sensor setup
   Serial.println("");
@@ -335,6 +345,8 @@ void tempSensorLoop() {
       long start_time = millis();
       sensor_retry_count++;
       while (start_time + (MAX_RETRY_S * 1000) > millis()) {
+        Serial.println("resetting the seonsor power.");
+        ds18b20_pwr_reset();
         Serial.println("try oneWire.reset");
         if (oneWire.reset()) {
           sprintf(error, "OneWire.reset(): found a sensor.");
