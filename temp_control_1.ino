@@ -330,77 +330,62 @@ void tempEmergencyLoop() {
   }
 }
 
-// calculate the current temparature rate (differentiation)
-void calc_cur_temp_rate() {
-  if (cur_temp > -100) {
-    hist_temp[hist_temp_pntr % HIST_TEMP_S] = cur_temp;
-    hist_temp_pntr++;
-    if (!hist_temp_initialized && hist_temp_pntr >= HIST_TEMP_S) {
-      hist_temp_initialized = true;
-    }
-    if (hist_temp_initialized) {
-      cur_temp_rate_m = (hist_temp[(hist_temp_pntr - 1) % HIST_TEMP_S] - hist_temp[hist_temp_pntr % HIST_TEMP_S]) * (60.0 / TEMP_SAMPLE_INTERVAL_S / HIST_TEMP_S);  // minute rate in °C
-      Serial.print("cur_temp_rate_m ="); Serial.print(cur_temp_rate_m);Serial.println("°C/min.");
-    }
-  }
-}
-
-#define SENSOR_TEMP_SIZE 4
-float sensor_temp_sum=0;
-uint8_t sensor_temp_success=0;
 #define MAX_RETRY_S 10  // seconds to retry sensor connection in case it is disconnected
-
 void tempSensorLoop() {
   if (isTimeToSampleDHT()) {
-    sensor_temp_sum = 0;
-    sensor_temp_success = 0;
-    for (sensor_temp_success = 0; sensor_temp_success < SENSOR_TEMP_SIZE; sensor_temp_success++){
-      sensors.requestTemperatures();
-      if (float sense = sensors.getTempCByIndex(0) > DALLAS_ERROR_TEMP) {
-        sensor_temp_sum += sense;
-        sensor_temp_success ++;
-      } else {
-        Serial.println("[E]RROR: could not read temperature from sensor, but will try again.");
-        sprintf(error, "Sensor Error, could not read temperature\n");
-        error_flag = true;
-        long start_time = millis();
-        sensor_retry_count++;
-        while (start_time + (MAX_RETRY_S * 1000) > millis()) {
-          Serial.println("resetting the seonsor power.");
-          ds18b20_pwr_reset();
-          Serial.println("try oneWire.reset");
-          if (oneWire.reset()) {
-            sprintf(error, "OneWire.reset(): found a sensor.");
-            Serial.println("try oneWire.reset_search()");
-            oneWire.reset_search();
-            uint8_t address;
-            Serial.println("try oneWire.search()");
-            if (oneWire.search(&address)) {
-              sprintf(error, "OneWire.search(): found a sensor.");
-            }
-            sensors.begin();
-            Serial.println("try sensors.requestTemperatures()");
-            sensors.requestTemperatures();
-            Serial.println("try sensors.getTempCByIndex");
-            if (float temp = sensors.getTempCByIndex(0) > DALLAS_ERROR_TEMP) {
-              error_flag = false;
-              sprintf(error, "[W]arn: recovered from sensor error. Could get temperature: %f", temp);
-              sensor_temp_sum += temp;
-              sensor_temp_success += 1;
-              break; // leave the while loop
-            }
-          } else {
-            sprintf(error, "OneWire.reset(): Didn't get temperature, didn't find a sensor. Cabling or power defect?");
-            Serial.println("OneWire.reset(): Sensor did not answer.");
+    sensors.requestTemperatures();
+    float sensor_temp = sensors.getTempCByIndex(0);
+    if (sensor_temp > DALLAS_ERROR_TEMP) {
+      cur_temp = sensor_temp;
+      Serial.print("Cur. Temperature measured to be: "); Serial.print(cur_temp); Serial.println(" ºC");
+    } else {
+      Serial.println("[E]RROR: could not read temperature from sensor, but will try again.");
+      sprintf(error, "Sensor Error, could not read temperature\n");
+      error_flag = true;
+      long start_time = millis();
+      sensor_retry_count++;
+      while (start_time + (MAX_RETRY_S * 1000) > millis()) {
+        Serial.println("resetting the seonsor power.");
+        ds18b20_pwr_reset();
+        Serial.println("try oneWire.reset");
+        if (oneWire.reset()) {
+          sprintf(error, "OneWire.reset(): found a sensor.");
+          Serial.println("try oneWire.reset_search()");
+          oneWire.reset_search();
+          uint8_t address;
+          Serial.println("try oneWire.search()");
+          if (oneWire.search(&address)) {
+            sprintf(error, "OneWire.search(): found a sensor.");
           }
-          delay(500);
+          sensors.begin();
+          Serial.println("try sensors.requestTemperatures()");
+          sensors.requestTemperatures();
+          Serial.println("try sensors.getTempCByIndex");
+          if (float temp = sensors.getTempCByIndex(0) > DALLAS_ERROR_TEMP) {
+            error_flag = false;
+            sprintf(error, "[W]arn: recovered from sensor error. Could get temperature: %f", temp);
+            cur_temp = temp;
+            break; // leave the while loop
+          }
+        } else {
+          sprintf(error, "OneWire.reset(): Didn't get temperature, didn't find a sensor. Cabling or power defect?");
+          Serial.println("OneWire.reset(): Sensor did not answer.");
         }
+        delay(500);
       }
-      cur_temp = sensor_temp_sum/sensor_temp_success;
-      Serial.print("Current measured temperature:");Serial.print(cur_temp);Serial.println("°C");
     }
     DHTSampleTimeMarker = millis();
-    calc_cur_temp_rate();
+    if (cur_temp > -100) {
+      hist_temp[hist_temp_pntr % HIST_TEMP_S] = cur_temp;
+      hist_temp_pntr++;
+      if (!hist_temp_initialized && hist_temp_pntr >= HIST_TEMP_S) {
+        hist_temp_initialized = true;
+      }
+      if (hist_temp_initialized) {
+        cur_temp_rate_m = (hist_temp[(hist_temp_pntr - 1) % HIST_TEMP_S] - hist_temp[hist_temp_pntr % HIST_TEMP_S]) * (60.0 / TEMP_SAMPLE_INTERVAL_S / HIST_TEMP_S);  // minute rate in °C
+        Serial.print("cur_temp_rate_m ="); Serial.print(cur_temp_rate_m);Serial.println("°C/min.");
+      }
+    }
   }
 }
 
