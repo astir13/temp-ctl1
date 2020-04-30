@@ -40,7 +40,7 @@
 #include <OneWire.h>  // OneWire by Jim Studt 2.3.5
 #include <DallasTemperature.h>  // DallasTemperature by Miles Burton 3.8.0
 
-#define FW_VERSION "1.00_20200429-009"
+#define FW_VERSION "1.00_20200430-002"
 
 // a well protected error variable (start of memory)
 #define MAX_ERROR_LENGTH 150
@@ -330,6 +330,20 @@ void tempEmergencyLoop() {
   }
 }
 
+void calc_temp_rate() {
+  if (cur_temp > -100) {
+    hist_temp[hist_temp_pntr % HIST_TEMP_S] = cur_temp;
+    hist_temp_pntr++;
+    if (!hist_temp_initialized && hist_temp_pntr >= HIST_TEMP_S) {
+      hist_temp_initialized = true;
+    }
+    if (hist_temp_initialized) {
+      cur_temp_rate_m = (hist_temp[(hist_temp_pntr - 1) % HIST_TEMP_S] - hist_temp[hist_temp_pntr % HIST_TEMP_S]) * (60.0 / TEMP_SAMPLE_INTERVAL_S / HIST_TEMP_S);  // minute rate in °C
+      Serial.print("cur_temp_rate_m ="); Serial.print(cur_temp_rate_m);Serial.println("°C/min.");
+    }
+  }
+}
+
 #define MAX_RETRY_S 10  // seconds to retry sensor connection in case it is disconnected
 void tempSensorLoop() {
   if (isTimeToSampleDHT()) {
@@ -375,17 +389,7 @@ void tempSensorLoop() {
       }
     }
     DHTSampleTimeMarker = millis();
-    if (cur_temp > -100) {
-      hist_temp[hist_temp_pntr % HIST_TEMP_S] = cur_temp;
-      hist_temp_pntr++;
-      if (!hist_temp_initialized && hist_temp_pntr >= HIST_TEMP_S) {
-        hist_temp_initialized = true;
-      }
-      if (hist_temp_initialized) {
-        cur_temp_rate_m = (hist_temp[(hist_temp_pntr - 1) % HIST_TEMP_S] - hist_temp[hist_temp_pntr % HIST_TEMP_S]) * (60.0 / TEMP_SAMPLE_INTERVAL_S / HIST_TEMP_S);  // minute rate in °C
-        Serial.print("cur_temp_rate_m ="); Serial.print(cur_temp_rate_m);Serial.println("°C/min.");
-      }
-    }
+    calc_temp_rate();
   }
 }
 
