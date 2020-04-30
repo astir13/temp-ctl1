@@ -40,7 +40,7 @@
 #include <OneWire.h>  // OneWire by Jim Studt 2.3.5
 #include <DallasTemperature.h>  // DallasTemperature by Miles Burton 3.8.0
 
-#define FW_VERSION "1.00_20200430-002"
+#define FW_VERSION "1.00_20200430-004"
 
 // a well protected error variable (start of memory)
 #define MAX_ERROR_LENGTH 150
@@ -339,7 +339,13 @@ void calc_temp_rate() {
     }
     if (hist_temp_initialized) {
       cur_temp_rate_m = (cur_temp - hist_temp[hist_temp_pntr % HIST_TEMP_S]) * (60.0 / TEMP_SAMPLE_INTERVAL_S / HIST_TEMP_S);  // minute rate in °C
-      Serial.print("cur_temp_rate_m ="); Serial.print(cur_temp_rate_m);Serial.println("°C/min.");
+      if (cur_temp_rate_m < 30 && cur_temp_rate_m > -30) {
+        Serial.print("cur_temp_rate_m ="); Serial.print(cur_temp_rate_m);Serial.println("°C/min.");
+      } else {
+        Serial.print("cur_temp_rate_m is set to 0 because not believable: ");Serial.print(cur_temp_rate_m);Serial.println("°C/min.");
+        sprintf(error, "cur_temp_rate_m out of range");
+        cur_temp_rate_m = 0;
+      }
     }
   }
 }
