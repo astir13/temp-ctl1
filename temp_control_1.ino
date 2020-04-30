@@ -40,15 +40,18 @@
 #include <OneWire.h>  // OneWire by Jim Studt 2.3.5
 #include <DallasTemperature.h>  // DallasTemperature by Miles Burton 3.8.0
 
-#define FW_VERSION "1.00_20200420-001"
+#define FW_VERSION "1.00_20200429-009"
 
 // a well protected error variable (start of memory)
 #define MAX_ERROR_LENGTH 150
 char error[MAX_ERROR_LENGTH] = "";
 bool error_flag = false;  // if true, the system is in error
 
-#define DS18B20_PIN D5
+#define DS18B20_PIN D5  // DATA pin
+#define DS18B20_PWR D4  // used to provide sensor with controllable power
 #define DALLAS_ERROR_TEMP -127  // Dallas lib. indicates sensor disconnected
+long sensor_retry_count = 0;  // count problems with this sensor
+
 // Setup a oneWire instance to communicate with any OneWire devices
 OneWire oneWire(DS18B20_PIN);
 
@@ -64,6 +67,10 @@ DallasTemperature sensors(&oneWire);
 #define RELAIS D0  // 0: on, 1: off
 bool relais_state = 1; // 1: off, 0: on
 
+// Heater dynamics
+#define HEATER_OFF_DELAY_M 2.5  // minutes before switching off the heater shows effect
+#define HEATER_ON_DELAY_M 5 // minutes before switching on the heater shows effect
+
 // for development, use that code
 //#define STASSID "MyAccessPointAtMyLab"
 //#define STAPSK  "MyPassword"
@@ -76,7 +83,8 @@ const char *password = STAPSK;
 
 
 static unsigned long DHTSampleTimeMarker = 0;
-#define isTimeToSampleDHT() ((millis() - DHTSampleTimeMarker) > 1000)
+#define TEMP_SAMPLE_INTERVAL_S 5  // seconds between temperature samples.
+#define isTimeToSampleDHT() ((millis() - DHTSampleTimeMarker) > (TEMP_SAMPLE_INTERVAL_S * 1000))
 
 
 ESP8266WebServer server(80);
@@ -91,11 +99,17 @@ static unsigned long temp5minSampleTimeMarker = 0;
 #define isTimeToUpdateTempLog() ((millis() - temp5minSampleTimeMarker) > 5 * 60 * 1000)
 
 float cur_temp = -100.0;
+float cur_temp_rate_m = 0; // °C/minute change rate 
+#define HIST_TEMP_S 4  // samples for the temp history buffer used to calc. rate
+float hist_temp[HIST_TEMP_S]; // historical temperature buffer
+uint8_t hist_temp_pntr = 0; // historial temperature buffer pointer
+bool hist_temp_initialized = false; // indicates weather the first rate can be calculated
 int8_t target_temp = 62;  // default is 63 degrees Celsius
+#define TARGET_TOLERANCE 4 // °C tolerance to count warm minutes
 uint8_t target_hours = 16; // how many hours before shut off
 bool target_reached = false;
 #define MAX_TEMP 65  // emergency temperature we never want to exceed
-#define HYSTERESIS 1  // ºC up and down from target temp when heating is switched on and off
+#define HYSTERESIS 0.2  // ºC up and down from target temp when heating is switched on and off
 
 void handleRoot() {
   digitalWrite(LED, 1);
@@ -115,7 +129,8 @@ void handleRoot() {
   </head>\
   <body>\
     <h1>Temperature Curve since power on</h1>\
-    <h2 style=\"color:red;\">%s</h2>\ 
+    <h2 style=\"color:red;\">%s</h2>\
+    <p>sensor retries: %d</p>\
     <p>Firmware Version: %s</p>\
     <p>Registration: <input type=\"text\" value=\"OY-CBX\"/></p>\
     <p>Part/location: <input type=\"text\" value=\"right wing, root rib\"/></p>\
@@ -126,13 +141,14 @@ void handleRoot() {
     <p>Current Max. Temperature: %3d deg. C</p>\
     <p>Current Heater Control Relais State: %s</p>\
     <p>Next Temperature Sample number: %3d</p>\
-    <p>Hours with Temperature >= target - 2 deg. C: %3.1f hr.</p>\
+    <p>Hours with Temperature >= target - %d deg. C: %3.1f hr.</p>\
     <p>Target time reached: %s</p>\
     <img src=\"/test.svg\" />\
     <button onClick=\"window.location.reload();\">Refresh Page</button>\
   </body>\
 </html>",
            error,
+           sensor_retry_count,
            FW_VERSION,
            hr, min % 60, sec % 60, 
            cur_temp,
@@ -140,6 +156,7 @@ void handleRoot() {
            MAX_TEMP,
            relais_state ? "off" : "on",
            next_sample,
+           TARGET_TOLERANCE,
            (float)warmMinutes / 60.0,
            target_reached ? "yes, stopped heating" : "not reached, still heating"
           );
@@ -196,11 +213,20 @@ void drawGraph() {
   Serial.print("Out buffer used:");Serial.println(out.length());
 }
 
+// issue a power reset with 5 seconds pause to the sensor
+void ds18b20_pwr_reset() {
+  digitalWrite(DS18B20_PWR, LOW);
+  delay(5000);
+  digitalWrite(DS18B20_PWR, HIGH);
+}
+
 void setup(void) {
   pinMode(LED, OUTPUT);
   digitalWrite(LED, LOW);
   pinMode(RELAIS, OUTPUT);
   digitalWrite(RELAIS, HIGH);  // relais off
+  pinMode(DS18B20_PWR, OUTPUT);
+  ds18b20_pwr_reset();
   Serial.begin(115200);
   sensors.begin(); // Temp. sensor setup
   Serial.println("");
@@ -280,10 +306,10 @@ void tempCtrlLoop() {
     if (target_temp > MAX_TEMP) {  // protection against memory overwriting
       target_temp = MAX_TEMP - HYSTERESIS;
     }
-    if (error_flag || target_reached || (cur_temp >= target_temp + HYSTERESIS)) {
+    if (relais_state == 0 && (error_flag || target_reached || (cur_temp + (cur_temp_rate_m * HEATER_OFF_DELAY_M) >= target_temp + HYSTERESIS))) {
       relais_state = 1;  // relais off
     } else {
-      if ((cur_temp <= target_temp - HYSTERESIS) && !target_reached) {
+      if (relais_state == 1 && !target_reached && (cur_temp + (cur_temp_rate_m * HEATER_ON_DELAY_M) <= target_temp - HYSTERESIS)) {
         relais_state = 0;  // realis on
       }
     }
@@ -304,6 +330,7 @@ void tempEmergencyLoop() {
   }
 }
 
+#define MAX_RETRY_S 10  // seconds to retry sensor connection in case it is disconnected
 void tempSensorLoop() {
   if (isTimeToSampleDHT()) {
     sensors.requestTemperatures();
@@ -312,11 +339,53 @@ void tempSensorLoop() {
       cur_temp = sensor_temp;
       Serial.print("Cur. Temperature measured to be: "); Serial.print(cur_temp); Serial.println(" ºC");
     } else {
-      Serial.println("[E]RROR: could not read temperature from sensor");
+      Serial.println("[E]RROR: could not read temperature from sensor, but will try again.");
       sprintf(error, "Sensor Error, could not read temperature\n");
       error_flag = true;
+      long start_time = millis();
+      sensor_retry_count++;
+      while (start_time + (MAX_RETRY_S * 1000) > millis()) {
+        Serial.println("resetting the seonsor power.");
+        ds18b20_pwr_reset();
+        Serial.println("try oneWire.reset");
+        if (oneWire.reset()) {
+          sprintf(error, "OneWire.reset(): found a sensor.");
+          Serial.println("try oneWire.reset_search()");
+          oneWire.reset_search();
+          uint8_t address;
+          Serial.println("try oneWire.search()");
+          if (oneWire.search(&address)) {
+            sprintf(error, "OneWire.search(): found a sensor.");
+          }
+          sensors.begin();
+          Serial.println("try sensors.requestTemperatures()");
+          sensors.requestTemperatures();
+          Serial.println("try sensors.getTempCByIndex");
+          if (float temp = sensors.getTempCByIndex(0) > DALLAS_ERROR_TEMP) {
+            error_flag = false;
+            sprintf(error, "[W]arn: recovered from sensor error. Could get temperature: %f", temp);
+            cur_temp = temp;
+            break; // leave the while loop
+          }
+        } else {
+          sprintf(error, "OneWire.reset(): Didn't get temperature, didn't find a sensor. Cabling or power defect?");
+          Serial.println("OneWire.reset(): Sensor did not answer.");
+        }
+        delay(500);
+      }
     }
     DHTSampleTimeMarker = millis();
+    if (cur_temp > -100) {
+      hist_temp[hist_temp_pntr % HIST_TEMP_S] = cur_temp;
+      hist_temp_pntr++;
+      if (!hist_temp_initialized && hist_temp_pntr >= HIST_TEMP_S) {
+        hist_temp_initialized = true;
+      }
+      if (hist_temp_initialized) {
+        cur_temp_rate_m = (hist_temp[(hist_temp_pntr - 1) % HIST_TEMP_S] - hist_temp[hist_temp_pntr % HIST_TEMP_S]) * (60.0 / TEMP_SAMPLE_INTERVAL_S / HIST_TEMP_S);  // minute rate in °C
+        Serial.print("cur_temp_rate_m ="); Serial.print(cur_temp_rate_m);Serial.println("°C/min.");
+      }
+    }
   }
 }
 
@@ -337,7 +406,7 @@ static unsigned long finishedLoopMarker = 0;
 void finishedLoop() {
   if (isTimeToCheckFinished()) {
     finishedLoopMarker = millis();
-    if (cur_temp >= target_temp - 2) {
+    if (cur_temp >= target_temp - TARGET_TOLERANCE) {
       warmMinutes ++;
     }
     if (warmMinutes >= target_hours * 60) {
