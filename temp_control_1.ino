@@ -40,7 +40,7 @@
 #include <OneWire.h>  // OneWire by Jim Studt 2.3.5
 #include <DallasTemperature.h>  // DallasTemperature by Miles Burton 3.8.0
 
-#define FW_VERSION "1.00_20200430-004"
+#define FW_VERSION "1.00_20200515-001"
 
 // a well protected error variable (start of memory)
 #define MAX_ERROR_LENGTH 150
@@ -104,7 +104,8 @@ float cur_temp_rate_m = 0; // °C/minute change rate
 float hist_temp[HIST_TEMP_S]; // historical temperature buffer
 uint8_t hist_temp_pntr = 0; // historial temperature buffer pointer
 bool hist_temp_initialized = false; // indicates weather the first rate can be calculated
-int8_t target_temp = 62;  // default is 63 degrees Celsius
+#define TARGET_TEMP 61.0
+float cur_target_temp = 0;
 #define TARGET_TOLERANCE 4 // °C tolerance to count warm minutes
 uint8_t target_hours = 16; // how many hours before shut off
 bool target_reached = false;
@@ -112,13 +113,14 @@ bool target_reached = false;
 #define HYSTERESIS 0.2  // ºC up and down from target temp when heating is switched on and off
 
 void handleRoot() {
+  Serial.println("handleRoot:start");
   digitalWrite(LED, 1);
   char temp[1400];
   int sec = millis() / 1000;
   int min = sec / 60;
   int hr = min / 60;
 
-  snprintf(temp, 2000,
+  snprintf(temp, 1400,
 
            "<html>\
   <head>\
@@ -152,7 +154,7 @@ void handleRoot() {
            FW_VERSION,
            hr, min % 60, sec % 60, 
            cur_temp,
-           target_temp,
+           cur_target_temp,
            MAX_TEMP,
            relais_state ? "off" : "on",
            next_sample,
@@ -162,6 +164,7 @@ void handleRoot() {
           );
   server.send(200, "text/html", temp);
   digitalWrite(LED, 0);
+  Serial.println("handleRoot:stop");
 }
 
 void handleNotFound() {
@@ -184,6 +187,7 @@ void handleNotFound() {
 }
 
 void drawGraph() {
+  Serial.println("drawGraph:start");
   String out;
   out.reserve(30000);
   char temp[150];
@@ -191,7 +195,7 @@ void drawGraph() {
   out += "<text x=\"1000\" y=\"185\" fill=\"black\">hours</text>";
   out += "<text x=\"0\" y=\"165\" fill=\"black\">&#8451;</text>";
   out += "<rect x=\"20\" y=\"1\" width=\"1000\" height=\"150\" fill=\"rgb(250, 230, 210)\" stroke-width=\"2\" stroke=\"rgb(0, 0, 0)\" />\n";
-  sprintf(temp, "<line stroke-dasharray=\"5, 5\" x1=\"%d\" y1=\"%d\" x2=\"%d\" y2=\"%d\" stroke=\"red\" stroke-width=\"1\" />\n", 22, 145-(2* target_temp), 22 + 1000 - 2, 145-(2* target_temp));
+  sprintf(temp, "<line stroke-dasharray=\"5, 5\" x1=\"%d\" y1=\"%d\" x2=\"%d\" y2=\"%d\" stroke=\"red\" stroke-width=\"1\" />\n", 22, 145-(2* TARGET_TEMP), 22 + 1000 - 2, 145-(2* TARGET_TEMP));
   out += temp;
   for (int tmp = 10; tmp < 71; tmp += 20) {
     sprintf(temp, "<text x=\"0\" y=\"%d\" fill=\"black\">%d</text>", 145-(2*tmp)+7, tmp);
@@ -210,7 +214,7 @@ void drawGraph() {
  }
   out += "</g>\n</svg>\n";
   server.send(200, "image/svg+xml", out);
-  Serial.print("Out buffer used:");Serial.println(out.length());
+  Serial.print("DrawGraph() stop: Out buffer used:");Serial.println(out.length());
 }
 
 // issue a power reset with 5 seconds pause to the sensor
@@ -295,6 +299,24 @@ void setup(void) {
   server.onNotFound(handleNotFound);
   server.begin();
   Serial.println("HTTP server started");
+  tempSensorLoop(); // read temperature for first time
+  cur_target_temp = cur_temp + 1.67;  //initialize
+}
+
+static unsigned long target_temp_calc_last = 0;
+#define isTimeToUpdateTargetTemp() ((millis() - target_temp_calc_last) > 10 * 60 * 1000) // all 10 minutes
+void calc_target_temp() {
+  if (next_sample >= 2)  {  // first time after 10 minutes
+    if (isTimeToUpdateTargetTemp()) {
+      Serial.print("Update Target temp to:");
+      if (cur_target_temp < TARGET_TEMP) {  // ramp up
+        cur_target_temp += + 1.67; // 1.67°/10 minutes = 10°/hr
+      } else {
+        cur_target_temp = TARGET_TEMP;  // keep at TARGET_TEMP when once reached TARGET_TEMP
+      }
+      Serial.print(cur_target_temp);Serial.println("°C");
+    }
+  }
 }
 
 /* TURN HEATER ON/OFF */
@@ -303,13 +325,14 @@ static unsigned long TempCtrlMarker = 0;
 #define isTimeToCtrlTemp() ((millis() - TempCtrlMarker) > TEMP_CTRL_INTERVAL_S * 1000)
 void tempCtrlLoop() {
   if (isTimeToCtrlTemp()) {
-    if (target_temp > MAX_TEMP) {  // protection against memory overwriting
-      target_temp = MAX_TEMP - HYSTERESIS;
+    calc_target_temp();
+    if (cur_target_temp > MAX_TEMP) {  // protection against memory overwriting
+      cur_target_temp = MAX_TEMP - HYSTERESIS;
     }
-    if (relais_state == 0 && (error_flag || target_reached || (cur_temp + (cur_temp_rate_m * HEATER_OFF_DELAY_M) >= target_temp + HYSTERESIS))) {
+    if (relais_state == 0 && (error_flag || target_reached || (cur_temp + (cur_temp_rate_m * HEATER_OFF_DELAY_M) >= cur_target_temp + HYSTERESIS) || cur_temp > MAX_TEMP)) {
       relais_state = 1;  // relais off
     } else {
-      if (relais_state == 1 && !target_reached && (cur_temp + (cur_temp_rate_m * HEATER_ON_DELAY_M) <= target_temp - HYSTERESIS)) {
+      if (relais_state == 1 && !target_reached && (cur_temp + (cur_temp_rate_m * HEATER_ON_DELAY_M) <= cur_target_temp - HYSTERESIS)) {
         relais_state = 0;  // realis on
       }
     }
@@ -327,6 +350,7 @@ void tempCtrlLoop() {
 void tempEmergencyLoop() {
   if (error_flag || cur_temp > MAX_TEMP) {
     digitalWrite(RELAIS, HIGH);  // relais off
+    Serial.println("Temp > MAX_TEMP => Relais off");
   }
 }
 
@@ -358,7 +382,7 @@ void tempSensorLoop() {
     float sensor_temp = sensors.getTempCByIndex(0);
     if (sensor_temp > DALLAS_ERROR_TEMP) {
       cur_temp = sensor_temp;
-      Serial.print("Cur. Temperature measured to be: "); Serial.print(cur_temp); Serial.println(" ºC");
+      Serial.print("Cur. Temperature measured to be: "); Serial.print(cur_temp); Serial.print(" ºC, target: "); Serial.print(cur_target_temp); Serial.println(" °C");
     } else {
       Serial.println("[E]RROR: could not read temperature from sensor, but will try again.");
       sprintf(error, "Sensor Error, could not read temperature\n");
@@ -416,7 +440,7 @@ static unsigned long finishedLoopMarker = 0;
 void finishedLoop() {
   if (isTimeToCheckFinished()) {
     finishedLoopMarker = millis();
-    if (cur_temp >= target_temp - TARGET_TOLERANCE) {
+    if (cur_temp >= cur_target_temp - TARGET_TOLERANCE) {
       warmMinutes ++;
     }
     if (warmMinutes >= target_hours * 60) {
