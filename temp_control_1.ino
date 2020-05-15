@@ -315,6 +315,7 @@ void calc_target_temp() {
         cur_target_temp = TARGET_TEMP;  // keep at TARGET_TEMP when once reached TARGET_TEMP
       }
       Serial.print(cur_target_temp);Serial.println("°C");
+      target_temp_calc_last = millis();
     }
   }
 }
