@@ -43,7 +43,7 @@
 #define FW_VERSION "1.00_20200515-001"
 
 // testing
-//#define TESTING_TEMP_CTL  // define this to avoid 10°C/hr ramp up phase
+#define TESTING_TEMP_CTL  // define this to avoid 10°C/hr ramp up phase
 
 // a well protected error variable (start of memory)
 #define MAX_ERROR_LENGTH 150
@@ -311,7 +311,7 @@ void setup(void) {
 }
 
 static unsigned long target_temp_calc_last = 0;
-#define isTimeToUpdateTargetTemp() ((millis() - target_temp_calc_last) > 0.32 * 60 * 1000) // all 10 minutes
+#define isTimeToUpdateTargetTemp() ((millis() - target_temp_calc_last) > 10 * 60 * 1000) // all 10 minutes
 void calc_target_temp() {
   if (isTimeToUpdateTargetTemp()) {
     Serial.print("Update Target temp to:");
