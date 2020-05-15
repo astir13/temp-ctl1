@@ -42,6 +42,9 @@
 
 #define FW_VERSION "1.00_20200515-001"
 
+// testing
+//#define TESTING_TEMP_CTL  // define this to avoid 10°C/hr ramp up phase
+
 // a well protected error variable (start of memory)
 #define MAX_ERROR_LENGTH 150
 char error[MAX_ERROR_LENGTH] = "";
@@ -300,23 +303,25 @@ void setup(void) {
   server.begin();
   Serial.println("HTTP server started");
   tempSensorLoop(); // read temperature for first time
+#ifdef TESTING_TEMP_CTL
+  cur_target_temp = TARGET_TEMP;  //initialize
+#else
   cur_target_temp = cur_temp + 1.67;  //initialize
+#endif
 }
 
 static unsigned long target_temp_calc_last = 0;
-#define isTimeToUpdateTargetTemp() ((millis() - target_temp_calc_last) > 10 * 60 * 1000) // all 10 minutes
+#define isTimeToUpdateTargetTemp() ((millis() - target_temp_calc_last) > 0.32 * 60 * 1000) // all 10 minutes
 void calc_target_temp() {
-  if (next_sample >= 2)  {  // first time after 10 minutes
-    if (isTimeToUpdateTargetTemp()) {
-      Serial.print("Update Target temp to:");
-      if (cur_target_temp < TARGET_TEMP) {  // ramp up
-        cur_target_temp += + 1.67; // 1.67°/10 minutes = 10°/hr
-      } else {
-        cur_target_temp = TARGET_TEMP;  // keep at TARGET_TEMP when once reached TARGET_TEMP
-      }
-      Serial.print(cur_target_temp);Serial.println("°C");
-      target_temp_calc_last = millis();
+  if (isTimeToUpdateTargetTemp()) {
+    Serial.print("Update Target temp to:");
+    if (cur_target_temp < TARGET_TEMP) {  // ramp up
+      cur_target_temp += + 1.67; // 1.67°/10 minutes = 10°/hr
+    } else {
+      cur_target_temp = TARGET_TEMP;  // keep at TARGET_TEMP when once reached TARGET_TEMP
     }
+    Serial.print(cur_target_temp);Serial.println("°C");
+    target_temp_calc_last = millis();
   }
 }
 
