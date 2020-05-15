@@ -40,7 +40,7 @@
 #include <OneWire.h>  // OneWire by Jim Studt 2.3.5
 #include <DallasTemperature.h>  // DallasTemperature by Miles Burton 3.8.0
 
-#define FW_VERSION "1.00_20200515-003"
+#define FW_VERSION "1.01_20200515-003"
 
 // testing
 //#define TESTING_TEMP_CTL  // define this to avoid 10°C/hr ramp up phase
