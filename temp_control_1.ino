@@ -119,6 +119,7 @@ void handleRoot() {
   Serial.println("handleRoot:start");
   digitalWrite(LED, 1);
   char temp[1400];
+  Serial.println("temp allocated.");
   int sec = millis() / 1000;
   int min = sec / 60;
   int hr = min / 60;
@@ -165,7 +166,9 @@ void handleRoot() {
            (float)warmMinutes / 60.0,
            target_reached ? "yes, stopped heating" : "not reached, still heating"
           );
+  Serial.println("temp written.");
   server.send(200, "text/html", temp);
+  Serial.println("temp sent.");
   digitalWrite(LED, 0);
   Serial.println("handleRoot:stop");
 }
