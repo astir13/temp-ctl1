@@ -40,7 +40,7 @@
 #include <OneWire.h>  // OneWire by Jim Studt 2.3.5
 #include <DallasTemperature.h>  // DallasTemperature by Miles Burton 3.8.0
 
-#define FW_VERSION "1.00_20200515-001"
+#define FW_VERSION "1.00_20200515-002"
 
 // testing
 #define TESTING_TEMP_CTL  // define this to avoid 10°C/hr ramp up phase
@@ -107,7 +107,7 @@ float cur_temp_rate_m = 0; // °C/minute change rate
 float hist_temp[HIST_TEMP_S]; // historical temperature buffer
 uint8_t hist_temp_pntr = 0; // historial temperature buffer pointer
 bool hist_temp_initialized = false; // indicates weather the first rate can be calculated
-#define TARGET_TEMP 61.0
+#define TARGET_TEMP 61
 float cur_target_temp = 0;
 #define TARGET_TOLERANCE 4 // °C tolerance to count warm minutes
 uint8_t target_hours = 16; // how many hours before shut off
@@ -118,13 +118,12 @@ bool target_reached = false;
 void handleRoot() {
   Serial.println("handleRoot:start");
   digitalWrite(LED, 1);
-  char temp[1400];
+  char temp[2400];
   Serial.println("temp allocated.");
   int sec = millis() / 1000;
   int min = sec / 60;
   int hr = min / 60;
-
-  snprintf(temp, 1400,
+  snprintf(temp, 2400,
 
            "<html>\
   <head>\
@@ -143,11 +142,11 @@ void handleRoot() {
     <p>Date: <input type=\"text\" value=\"2020-03-23\"/></p>\
     <p>Uptime: %02d:%02d:%02d</p>\
     <p>Current Temperature: %3.1f deg. C</p>\
-    <p>Target Temperature: %3d deg. C</p>\
+    <p>Target Temperature: %3.1f deg. C</p>\
     <p>Current Max. Temperature: %3d deg. C</p>\
     <p>Current Heater Control Relais State: %s</p>\
     <p>Next Temperature Sample number: %3d</p>\
-    <p>Hours with Temperature >= target - %d deg. C: %3.1f hr.</p>\
+    <p>Hours with Temperature >= target - %3.1f deg. C: %3.1f hr.</p>\
     <p>Target time reached: %s</p>\
     <img src=\"/test.svg\" />\
     <button onClick=\"window.location.reload();\">Refresh Page</button>\
@@ -162,7 +161,7 @@ void handleRoot() {
            MAX_TEMP,
            relais_state ? "off" : "on",
            next_sample,
-           TARGET_TOLERANCE,
+           (float) TARGET_TOLERANCE,
            (float)warmMinutes / 60.0,
            target_reached ? "yes, stopped heating" : "not reached, still heating"
           );
