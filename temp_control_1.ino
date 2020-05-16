@@ -448,7 +448,7 @@ static unsigned long finishedLoopMarker = 0;
 void finishedLoop() {
   if (isTimeToCheckFinished()) {
     finishedLoopMarker = millis();
-    if (cur_temp >= cur_target_temp - TARGET_TOLERANCE) {
+    if (cur_temp >= TARGET_TEMP - TARGET_TOLERANCE) {
       warmMinutes ++;
     }
     if (warmMinutes >= target_hours * 60) {
