@@ -31,6 +31,13 @@
    ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+   FOR DM826 ESP8266 module with 0.91" display (https://heltec.org/project/wifi-kit-8/)
+   Install library Adafruit SSD1306 (test display with their 128x32 i2c test, but set RST pin to D0)
+   Solder the DS18B20 Temperature sensor to the GND (black) and the pins given below as
+   DS18B20_PIN (yellow cable) and DS18B20_PWR (red)
+   Use a 18650 battery with BMS as backup (very convenient)
+    
 */
 
 #include <ESP8266WiFi.h>
@@ -39,19 +46,30 @@
 #include <ESP8266mDNS.h>
 #include <OneWire.h>  // OneWire by Jim Studt 2.3.5
 #include <DallasTemperature.h>  // DallasTemperature by Miles Burton 3.8.0
+#include <Wire.h> // for the OLED
+#include <Adafruit_GFX.h> // for the OLED
+#include <Adafruit_SSD1306.h> // for the OLED
 
-#define FW_VERSION "1.01_20200515-003"
+#define FW_VERSION "1.11_20210522-001"
 
 // testing
 //#define TESTING_TEMP_CTL  // define this to avoid 10°C/hr ramp up phase
+
+// OLED
+// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 32 // OLED display height, in pixels
+#define OLED_RESET D0 // Reset pin # (or -1 if sharing Arduino reset pin)
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
 
 // a well protected error variable (start of memory)
 #define MAX_ERROR_LENGTH 150
 char error[MAX_ERROR_LENGTH] = "";
 bool error_flag = false;  // if true, the system is in error
 
-#define DS18B20_PIN D5  // DATA pin
-#define DS18B20_PWR D4  // used to provide sensor with controllable power
+#define DS18B20_PIN D3  // DATA pin
+#define DS18B20_PWR D8  // used to provide sensor with controllable power
 #define DALLAS_ERROR_TEMP -127  // Dallas lib. indicates sensor disconnected
 long sensor_retry_count = 0;  // count problems with this sensor
 
@@ -67,12 +85,12 @@ DallasTemperature sensors(&oneWire);
 #error Select ESP8266 board.
 #endif
 
-#define RELAIS D0  // 0: on, 1: off
+#define RELAIS D6  // 0: on, 1: off
 bool relais_state = 1; // 1: off, 0: on
 
 // Heater dynamics
 #define HEATER_OFF_DELAY_M 2.5  // minutes before switching off the heater shows effect
-#define HEATER_ON_DELAY_M 5 // minutes before switching on the heater shows effect
+#define HEATER_ON_DELAY_M 5 // misetnutes before switching on the heater shows effect
 
 // for development, use that code
 //#define STASSID "MyAccessPointAtMyLab"
@@ -92,7 +110,6 @@ static unsigned long DHTSampleTimeMarker = 0;
 
 ESP8266WebServer server(80);
 
-#define LED 13
 static unsigned long warmMinutes = 0;
 
 #define TEMP_SAMPLES 200
@@ -117,7 +134,6 @@ bool target_reached = false;
 
 void handleRoot() {
   Serial.println("handleRoot:start");
-  digitalWrite(LED, 1);
   char temp[2400];
   Serial.println("temp allocated.");
   int sec = millis() / 1000;
@@ -168,12 +184,10 @@ void handleRoot() {
   Serial.println("temp written.");
   server.send(200, "text/html", temp);
   Serial.println("temp sent.");
-  digitalWrite(LED, 0);
   Serial.println("handleRoot:stop");
 }
 
 void handleNotFound() {
-  digitalWrite(LED, 1);
   String message = "File Not Found\n\n";
   message += "URI: ";
   message += server.uri();
@@ -188,7 +202,6 @@ void handleNotFound() {
   }
 
   server.send(404, "text/plain", message);
-  digitalWrite(LED, 0);
 }
 
 void drawGraph() {
@@ -230,13 +243,31 @@ void ds18b20_pwr_reset() {
 }
 
 void setup(void) {
-  pinMode(LED, OUTPUT);
-  digitalWrite(LED, LOW);
+  Serial.begin(115200);
+  // OLED init
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3C for 128x32
+    Serial.println(F("\nSSD1306 allocation failed:no OLED found"));
+    for(;;); // Don't proceed, loop forever
+  } else {
+    Serial.println(F("\nSSD1306 initialized: OLED found"));
+    display.display();
+    delay(2000); // Pause for 2 seconds
+  }
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  display.setCursor(0,0);
+  display.cp437(true);
+  display.println("Temp control");
+  display.setCursor(0,7);
+  display.println(FW_VERSION);
+  display.display();
+  display.dim(true);
+  
   pinMode(RELAIS, OUTPUT);
   digitalWrite(RELAIS, HIGH);  // relais off
   pinMode(DS18B20_PWR, OUTPUT);
   ds18b20_pwr_reset();
-  Serial.begin(115200);
   sensors.begin(); // Temp. sensor setup
   Serial.println("");
   Serial.println("Temp Control by stefan@symlinux.com");
