@@ -142,12 +142,12 @@ void handleRoot() {
     <p>Date: <input type=\"text\" value=\"2020-03-23\"/></p>\
     <p>Uptime: %02d:%02d:%02d</p>\
     <p>Current Temperature: %3.1f deg. C</p>\
-    <p>Target Temperature: %3.1f deg. C</p>\
+    <p>Target Temperature: %3.1f/%3.1f deg. C</p>\
     <p>Current Max. Temperature: %3d deg. C</p>\
     <p>Current Heater Control Relais State: %s</p>\
     <p>Next Temperature Sample number: %3d</p>\
-    <p>Hours with Temperature >= target - %3.1f deg. C: %3.1f hr.</p>\
-    <p>Target time reached: %s</p>\
+    <p>Hours with Temperature >= %3.1f deg. C: %3.1f hr.</p>\
+    <p>Target time: %s</p>\
     <img src=\"/test.svg\" />\
     <button onClick=\"window.location.reload();\">Refresh Page</button>\
   </body>\
@@ -158,10 +158,11 @@ void handleRoot() {
            hr, min % 60, sec % 60, 
            cur_temp,
            cur_target_temp,
+           (float) TARGET_TEMP,
            MAX_TEMP,
            relais_state ? "off" : "on",
            next_sample,
-           (float) TARGET_TOLERANCE,
+           (float) TARGET_TEMP - (float) TARGET_TOLERANCE,
            (float)warmMinutes / 60.0,
            target_reached ? "yes, stopped heating" : "not reached, still heating"
           );
