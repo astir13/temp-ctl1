@@ -143,7 +143,7 @@ void handleRoot() {
 
            "<html>\
   <head>\
-    <title>Temperature Curve for Temp controller</title>\
+    <title>Temperature Curve for Temp controller (DM826)</title>\
     <style>\
       body { background-color: #cccccc; font-family: Arial, Helvetica, Sans-Serif; Color: #000088; }\
     </style>\
@@ -166,6 +166,7 @@ void handleRoot() {
     <p>Target time: %s</p>\
     <img src=\"/test.svg\" />\
     <button onClick=\"window.location.reload();\">Refresh Page</button>\
+    <a href=\"https://github.com/astir13/temp-ctl1/tree/dm826\">GitHub Project</a>\
   </body>\
 </html>",
            error,
@@ -251,8 +252,6 @@ void setup(void) {
     for(;;); // Don't proceed, loop forever
   } else {
     Serial.println(F("\nSSD1306 initialized: OLED found"));
-    display.display();
-    delay(2000); // Pause for 2 seconds
   }
   display.clearDisplay();
   display.setTextSize(1);
@@ -260,8 +259,10 @@ void setup(void) {
   display.setCursor(0,0);
   display.cp437(true);
   display.println("Temp control");
-  display.setCursor(0,7);
+  display.setCursor(0,10);
   display.println(FW_VERSION);
+  display.setCursor(0,20);
+  display.print("gihub/astir13/temp-ctrl1");
   display.display();
   display.dim(true);
   
@@ -490,6 +491,30 @@ void finishedLoop() {
   }
 }
 
+#define OLED_LOOP_INTERVAL_S 1
+static unsigned long oledLoopMarker = 0;
+#define isTimeToCheckOled() ((millis() - oledLoopMarker) > OLED_LOOP_INTERVAL_S * 1000)
+void oledLoop(void) {
+  if (isTimeToCheckOled()) {
+    char temp[200];
+    oledLoopMarker = millis();
+    display.clearDisplay();
+    display.setCursor(0,0);
+    snprintf(temp, 200, "T=%3.1f Tt=%3.1f/%3.1fC", cur_temp, cur_target_temp, (float) TARGET_TEMP);
+    display.print(temp);
+    display.setCursor(0,10);
+    snprintf(temp, 200, "Heat=%s Tm=%3.1fC/m", relais_state ? "off" : "on", cur_temp_rate_m);
+    display.print(temp);
+    display.setCursor(0,20);
+    snprintf(temp, 200, "tt=%3.1f tw=%3.1f/%3.1fh", 
+      (float) millis()/1000.0/60.0/60.0, // uptime [hours]
+      (float) warmMinutes / 60.0, // current achieved warm time [hours]
+      (float) target_hours); // target warm hours
+    display.print(temp);
+    display.display();
+  }
+}
+
 void loop(void) {
   server.handleClient();
   tempSensorLoop();
@@ -497,5 +522,6 @@ void loop(void) {
   tempEmergencyLoop();
   tempLogLoop();
   finishedLoop();
+  oledLoop();
   MDNS.update();
 }
