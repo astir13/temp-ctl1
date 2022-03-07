@@ -50,7 +50,7 @@
 #include <Adafruit_GFX.h> // for the OLED
 #include <Adafruit_SSD1306.h> // for the OLED
 
-#define FW_VERSION "1.11_20210523-001"
+#define FW_VERSION "1.20_20220208-001"
 
 // testing
 //#define TESTING_TEMP_CTL  // define this to avoid 10°C/hr ramp up phase
